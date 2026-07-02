@@ -4,7 +4,7 @@ const connect = require("./connect.js");
 const posts = require("./postRoutes");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const url = "http://localhost:5173";
 
 const corsOptions = {

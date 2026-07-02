@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const url = "http://http://localhost:5173/api";
+const url = "https://soundasleep-app.onrender.com";
 
 export default async function postData(collection, formData) {
   try {
