@@ -5,7 +5,7 @@ import {
   moodSoundsList,
   moodMessages,
 } from "../variables.js";
-import SoundCard from "./soundCard.jsx";
+import SoundCard from "./SoundCard.jsx";
 
 export default function SoundSelector({ mood, handleChange }) {
   const allowedTitles = moodSoundsList[mood] || [];
