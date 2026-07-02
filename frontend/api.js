@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const url = "http://localhost:3000";
+const url = "http://http://localhost:5173/api";
 
 export default async function postData(collection, formData) {
   try {
