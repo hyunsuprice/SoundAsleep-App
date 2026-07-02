@@ -8,7 +8,7 @@ const PORT = 3000;
 const url = "http://localhost:5173";
 
 const corsOptions = {
-  origin: url,
+  origin: [url, "https://sound-asleep-app.vercel.app/"],
   credentials: true,
 };
 
