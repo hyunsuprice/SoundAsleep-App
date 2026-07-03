@@ -1,13 +1,18 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlayCircle, faPauseCircle } from "@fortawesome/free-solid-svg-icons";
-import { sounds } from "../variables.js";
+import { getSoundscapeById } from "../variables.js";
 
-export default function SoundPlayer({selectedsound}) {
+export default function SoundPlayer({ participantId, soundscapeId }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [remainingTime, setRemainingTime] = useState(10); // For testing, use a shorter time
   const audioRef = useRef(null);
-  const soundObj = sounds.find((sound) => selectedsound === sound.title);
+  const sessionStartedAtRef = useRef(null);
+  const playStartedAtRef = useRef(null);
+  const totalPlayedSecondsRef = useRef(0);
+  const hasPlayedRef = useRef(false);
+  const sessionEndedRef = useRef(false);
+  const soundscape = getSoundscapeById(soundscapeId);
 
   // Function to format the time to hh:mm:ss
   function formatTime(seconds) {
@@ -20,7 +25,74 @@ export default function SoundPlayer({selectedsound}) {
     )}:${String(secs).padStart(2, "0")}`;
   }
 
+  const getAudioTimeSeconds = useCallback(function getAudioTimeSeconds() {
+    return Number((audioRef.current?.currentTime || 0).toFixed(2));
+  }, []);
+
+  const getTotalPlayedSeconds = useCallback(function getTotalPlayedSeconds() {
+    let totalPlayedSeconds = totalPlayedSecondsRef.current;
+
+    if (playStartedAtRef.current) {
+      totalPlayedSeconds += (Date.now() - playStartedAtRef.current) / 1000;
+    }
+
+    return Number(totalPlayedSeconds.toFixed(2));
+  }, []);
+
+  const trackEvent = useCallback(function trackEvent(eventType, extraData = {}) {
+    const event = {
+      participantId,
+      soundscapeId,
+      eventType,
+      audioTimeSeconds: getAudioTimeSeconds(),
+      totalPlayedSeconds: getTotalPlayedSeconds(),
+      timestamp: new Date().toISOString(),
+      ...extraData,
+    };
+
+    console.log("Playback event:", event);
+  }, [getAudioTimeSeconds, getTotalPlayedSeconds, participantId, soundscapeId]);
+
+  const ensureSessionStarted = useCallback(function ensureSessionStarted() {
+    if (sessionStartedAtRef.current) {
+      return;
+    }
+
+    sessionStartedAtRef.current = new Date().toISOString();
+    trackEvent("session_started", {
+      sessionStartedAt: sessionStartedAtRef.current,
+    });
+  }, [trackEvent]);
+
+  const addCurrentPlaySegment = useCallback(function addCurrentPlaySegment() {
+    if (!playStartedAtRef.current) {
+      return;
+    }
+
+    totalPlayedSecondsRef.current +=
+      (Date.now() - playStartedAtRef.current) / 1000;
+    playStartedAtRef.current = null;
+  }, []);
+
+  const endSession = useCallback(function endSession(reason) {
+    if (!sessionStartedAtRef.current || sessionEndedRef.current) {
+      return;
+    }
+
+    addCurrentPlaySegment();
+    sessionEndedRef.current = true;
+    trackEvent("session_ended", {
+      reason,
+      sessionStartedAt: sessionStartedAtRef.current,
+      sessionEndedAt: new Date().toISOString(),
+    });
+  }, [addCurrentPlaySegment, trackEvent]);
+
   useEffect(() => {
+    if (!audioRef.current) {
+      return;
+    }
+
     if (isPlaying) {
       audioRef.current.play();
     } else {
@@ -36,8 +108,13 @@ export default function SoundPlayer({selectedsound}) {
             return prevTime - 1; // Decrease by 1 second
           } else {
             clearInterval(interval); // Stop the countdown when it reaches 0
-            audioRef.current.pause(); // Pause the audio
-            audioRef.current.currentTime = 0; // Reset audio to the beginning
+            if (audioRef.current) {
+              audioRef.current.pause(); // Pause the audio
+              audioRef.current.currentTime = 0; // Reset audio to the beginning
+            }
+            addCurrentPlaySegment();
+            trackEvent("timer_complete");
+            endSession("timer_complete");
             setRemainingTime(10)
             setIsPlaying(false)
             return 0;
@@ -48,7 +125,7 @@ export default function SoundPlayer({selectedsound}) {
       // Cleanup the interval on component unmount or pause
       return () => clearInterval(interval);
     }
-  }, [isPlaying]);
+  }, [addCurrentPlaySegment, endSession, isPlaying, trackEvent]);
 
   // Set the audio to loop, but remove loop when the countdown reaches 0
   useEffect(() => {
@@ -57,22 +134,46 @@ export default function SoundPlayer({selectedsound}) {
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      endSession("left_player");
+    };
+  }, [endSession]);
+
   // Toggle play/pause
   function onToggle() {
-    setIsPlaying((prev) => !prev);
+    if (isPlaying) {
+      addCurrentPlaySegment();
+      trackEvent("pause");
+      setIsPlaying(false);
+      return;
+    }
+
+    ensureSessionStarted();
+    playStartedAtRef.current = Date.now();
+    trackEvent(hasPlayedRef.current ? "resume" : "play");
+    hasPlayedRef.current = true;
+    setIsPlaying(true);
   }
 
   // Stop the countdown when the audio finishes
   const onAudioEnded = () => {
+    addCurrentPlaySegment();
+    trackEvent("ended");
+    endSession("audio_ended");
     setIsPlaying(false);
     setRemainingTime(7200); // Reset time to 2 hours when the audio finishes
   };
+
+  if (!soundscape) {
+    return <p className="error">Selected soundscape could not be found.</p>;
+  }
 
   return (
     <div onClick={onToggle} className="soundPlayer">
       <div className="texts">
         <p>{isPlaying ? "Playing" : "Paused"}</p>
-        <h3>{soundObj.title}</h3>
+        <h3>{soundscape.title}</h3>
         <p>{formatTime(remainingTime)}</p> {/* Display remaining time */}
       </div>
       <FontAwesomeIcon
@@ -82,7 +183,7 @@ export default function SoundPlayer({selectedsound}) {
       />
       <audio
         ref={audioRef}
-        src={soundObj.audioUrl}
+        src={soundscape.audioUrl}
         onEnded={onAudioEnded} // Handle when audio ends
       />
     </div>

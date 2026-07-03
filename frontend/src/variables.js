@@ -1,53 +1,55 @@
-export const sounds = [
+export const soundscapes = [
   {
-    id: 1,
-    title: "Rain sound",
+    id: "001-rain",
+    participantId: "001",
+    title: "Rain Soundscape",
     imageUrl: "./rain_umbrella.jpg",
     audioUrl: "./rain sound.mp3",
     isPlaying: false,
   },
   {
-    id: 2,
-    title: "Underwater",
+    id: "001-underwater",
+    participantId: "001",
+    title: "Underwater Soundscape",
     imageUrl: "/underwater.jpg",
     audioUrl: "./underwater.mp3",
     isPlaying: false,
   },
   {
-    id: 3,
-    title: "Singing Bowls",
+    id: "002-bowls",
+    participantId: "002",
+    title: "Singing Bowls Soundscape",
     imageUrl: "/singingBowls.jpeg",
     audioUrl: "./singing bowls.mp3",
     isPlaying: false,
   },
   {
-    id: 4,
-    title: "Birds",
+    id: "002-birds",
+    participantId: "002",
+    title: "Birds Soundscape",
     imageUrl: "/birds.jpg",
     audioUrl: "./birds.mp3",
     isPlaying: false,
   },
   {
-    id: 5,
-    title: "Crickets",
+    id: "demo-crickets",
+    participantId: "demo",
+    title: "Crickets Soundscape",
     imageUrl: "/crickets.jpg",
     audioUrl: "./crickets.mp3",
     isPlaying: false,
   },
 ];
 
-export const moodSoundsList = {
-  Happy: ["Birds", "Rain sound", "Crickets"],
-  Stressed: ["Rain sound", "Underwater", "Singing Bowls"],
-  Calm: ["Rain sound", "Singing Bowls", "Crickets"],
-  Sad: ["Rain sound", "Underwater", "Singing Bowls"],
-};
+export function getSoundscapesForParticipant(participantId) {
+  const normalizedParticipantId = participantId.trim().toLowerCase();
 
-export const moodMessages = {
-  Stressed:
-    "Sorry to hear that you're feeling stressed.",
-  Sad: "Sorry to hear that you're feeling sad.",
-  Happy:
-    "Good to hear that you're feeling happy.",
-  Calm: "Good to hear that you're feeling calm.",
-};
+  return soundscapes.filter(
+    (soundscape) =>
+      soundscape.participantId.toLowerCase() === normalizedParticipantId
+  );
+}
+
+export function getSoundscapeById(soundscapeId) {
+  return soundscapes.find((soundscape) => soundscape.id === soundscapeId);
+}

@@ -8,11 +8,11 @@ function App() {
   const [screen, setScreen] = useState("enter-id");
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
-  const [selectedSound, setSelectedSound] = useState(null);
+  const [selectedSoundscapeId, setSelectedSoundscapeId] = useState(null);
 
   const handleChange = (key, value) => {
-    if (key === "selectedSound") {
-      setSelectedSound(value);
+    if (key === "selectedSoundscapeId") {
+      setSelectedSoundscapeId(value);
     }
   };
 
@@ -24,7 +24,7 @@ function App() {
       return;
     }
 
-    if (!selectedSound) {
+    if (!selectedSoundscapeId) {
       setError(true);
       return;
     }
@@ -37,6 +37,7 @@ function App() {
     if (code.trim() === "") {
       setError(true);
     } else {
+      setSelectedSoundscapeId(null);
       setScreen("select-sound");
       setError(false);
     }
@@ -66,13 +67,19 @@ function App() {
                 <p className="error">Please select a sound before submitting</p>
               )}
 
-              <SoundSelector handleChange={handleChange} />
+              <SoundSelector
+                participantId={code.trim()}
+                handleChange={handleChange}
+              />
             </div>
           )}
 
           {screen === "listen" && (
             <div>
-              <PlayingPage sound={selectedSound} />
+              <PlayingPage
+                participantId={code.trim()}
+                soundscapeId={selectedSoundscapeId}
+              />
               <button
                 className="btn-change"
                 type="button"

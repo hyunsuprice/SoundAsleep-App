@@ -8,7 +8,7 @@ const quotes = [
   "Sweet dreams",
 ];
 
-export default function PlayingPage({sound}){
+export default function PlayingPage({ participantId, soundscapeId }){
   const [currentQuote, setCurrentQuote] = useState(0);
 
     useEffect(() => {
@@ -31,7 +31,10 @@ export default function PlayingPage({sound}){
             </h2>
           ))}
         </div>
-        <SoundPlayer selectedsound={sound} />
+        <SoundPlayer
+          participantId={participantId}
+          soundscapeId={soundscapeId}
+        />
       </>
     );
 }
