@@ -2,12 +2,13 @@ import React, {useState, useEffect} from "react";
 import "../App.css";
 import SoundPlayer from "./SoundPlayer"
 
+const quotes = [
+  "Adjust the volume to your comfort level",
+  "Enjoy the sound",
+  "Sweet dreams",
+];
+
 export default function PlayingPage({sound}){
-    const quotes = [
-    "Adjust the volume to your comfort level",
-    "Enjoy the sound",
-    "Sweet dreams",
-  ];
   const [currentQuote, setCurrentQuote] = useState(0);
 
     useEffect(() => {

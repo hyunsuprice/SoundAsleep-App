@@ -1,36 +1,26 @@
 import React, { useState } from "react";
 import "../App.css";
-import {
-  sounds as initialSounds,
-  moodSoundsList,
-  moodMessages,
-} from "../variables.js";
+import { sounds as initialSounds } from "../variables.js";
 import SoundCard from "./SoundCard.jsx";
 
-export default function SoundSelector({ mood, handleChange }) {
-  const allowedTitles = moodSoundsList[mood] || [];
-  const filteredSounds = initialSounds.filter((sound) =>
-    allowedTitles.includes(sound.title)
-  );
-
-  const [recommendedSounds, setRecommendedSounds] = useState(filteredSounds);
+export default function SoundSelector({ handleChange }) {
+  const [availableSounds, setAvailableSounds] = useState(initialSounds);
 
   function handleToggle(targetSound) {
-    const updatedSounds = recommendedSounds.map((sound) =>
+    const updatedSounds = availableSounds.map((sound) =>
       sound.id === targetSound.id
         ? { ...sound, isPlaying: !sound.isPlaying }
         : { ...sound, isPlaying: false }
     );
-    setRecommendedSounds(updatedSounds);
+    setAvailableSounds(updatedSounds);
     handleChange("selectedSound", targetSound.title);
   }
 
   return (
     <div className="step-container">
-      <h4>{moodMessages[mood]}</h4>
-      <h4>We suggest three sounds to have a good night sleep:</h4>
+      <h4>Choose your soundscape:</h4>
 
-      {recommendedSounds.map((sound) => (
+      {availableSounds.map((sound) => (
         <SoundCard
           key={sound.id}
           sound={sound}

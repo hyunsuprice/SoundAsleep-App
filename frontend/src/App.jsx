@@ -1,46 +1,50 @@
 import { useState } from "react";
 import "./App.css";
-import postData from "../api.js";
 import CodeField from "./components/CodeField.jsx";
-import DayRating from "./components/DayRating.jsx";
-import RelaxSlider from "./components/RelaxSlider.jsx";
-import MoodSelector from "./components/MoodSelector.jsx";
 import SoundSelector from "./components/SoundSelector.jsx";
 import PlayingPage from "./components/PlayingPage.jsx";
 
 function App() {
-  const [step, setStep] = useState(1);
+  const [screen, setScreen] = useState("enter-id");
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
-  const [formData, setFormData] = useState({
-    day: "Productive",
-    relaxation: 5,
-    mood: "Happy",
-    selectedSound: null,
-    dateCreated: new Date(),
-  });
+  const [selectedSound, setSelectedSound] = useState(null);
 
   const handleChange = (key, value) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+    if (key === "selectedSound") {
+      setSelectedSound(value);
+    }
   };
 
-  const handlePost = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.selectedSound) {
+    if (screen === "enter-id") {
+      handleNext();
+      return;
+    }
+
+    if (!selectedSound) {
+      setError(true);
+      return;
+    }
+
+    setScreen("listen");
+    setError(false);
+  };
+
+  const handleNext = () => {
+    if (code.trim() === "") {
       setError(true);
     } else {
-      console.log("submitting");
-      postData(code, formData);
-      setStep(6);
+      setScreen("select-sound");
       setError(false);
     }
   };
-  const handleNext = () => {
-    if (code === "") {
-      setError(true);
-    } else {
-      setStep((prev) => prev + 1);
+
+  const handleBack = () => {
+    if (screen === "select-sound") {
+      setScreen("enter-id");
       setError(false);
     }
   };
@@ -48,65 +52,55 @@ function App() {
   return (
     <div className="App">
       <div className="container mt-5">
-        <form onSubmit={handlePost}>
-          {step === 1 && (
+        <form onSubmit={handleSubmit}>
+          {screen === "enter-id" && (
             <>
               {error && <p className="error">Please Enter a code</p>}
               <CodeField code={code} setCode={setCode} />
             </>
           )}
-          {step === 2 && (
-            <DayRating day={formData.day} handleChange={handleChange} />
-          )}
-          {step === 3 && (
-            <RelaxSlider
-              relax={formData.relaxation}
-              handleChange={handleChange}
-            />
-          )}
-          {step === 4 && (
-            <MoodSelector mood={formData.mood} handleChange={handleChange} />
-          )}
 
-          {step === 5 && (
+          {screen === "select-sound" && (
             <div>
               {error && (
                 <p className="error">Please select a sound before submitting</p>
               )}
 
-              <SoundSelector mood={formData.mood} handleChange={handleChange} />
+              <SoundSelector handleChange={handleChange} />
             </div>
           )}
 
-          {step === 6 && (
+          {screen === "listen" && (
             <div>
-              <PlayingPage sound={formData.selectedSound} />
-              <button className="btn-change" onClick={() => setStep(5)}>
+              <PlayingPage sound={selectedSound} />
+              <button
+                className="btn-change"
+                type="button"
+                onClick={() => setScreen("select-sound")}
+              >
                 Change Sound
               </button>
             </div>
           )}
-          <div className="btn-container">
-            {step > 1 && step < 6 && (
-              <button
-                className="btn-back"
-                type="button"
-                onClick={() => setStep((prev) => prev - 1)}
-              >
-                Back
-              </button>
-            )}
-            {step < 5 && (
-              <button className="btn-next" type="button" onClick={handleNext}>
-                Next
-              </button>
-            )}
-            {step === 5 && (
-              <button className="btn-next" type="submit">
-                Submit
-              </button>
-            )}
-          </div>
+          {screen !== "listen" && (
+            <div className="btn-container">
+              {screen === "select-sound" && (
+                <button className="btn-back" type="button" onClick={handleBack}>
+                  Back
+                </button>
+              )}
+              {screen === "enter-id" && (
+                <button className="btn-next" type="button" onClick={handleNext}>
+                  Next
+                </button>
+              )}
+              {screen === "select-sound" && (
+                <button className="btn-next" type="submit">
+                  Continue
+                </button>
+              )}
+            </div>
+          )}
         </form>
       </div>
     </div>
