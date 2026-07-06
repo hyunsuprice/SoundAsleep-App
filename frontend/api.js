@@ -1,12 +1,22 @@
 import axios from "axios";
 
-const url = "https://soundasleep-app.onrender.com";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:3000"
+    : "https://soundasleep-app.onrender.com");
 
-export default async function postData(collection, formData) {
+export async function postPlaybackEvent(event) {
   try {
-    const response = await axios.post(`${url}/${collection}/posts`, formData);
-    console.log("Successfully posted:", response.data);
+    const response = await axios.post(`${API_URL}/playback-events`, event);
+    return response.data;
   } catch (error) {
-    console.error("Error posting data:", error.message);
+    console.error("Error saving playback event:", {
+      apiUrl: `${API_URL}/playback-events`,
+      message: error.message,
+      status: error.response?.status,
+      response: error.response?.data,
+    });
+    return null;
   }
 }

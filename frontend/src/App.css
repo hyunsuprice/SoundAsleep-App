@@ -1,40 +1,34 @@
-*, *:before, *:after {
-    box-sizing: border-box;
-}
-html { height: 100%; } 
-
 body {
-    background: linear-gradient(220deg, rgb(4, 48, 142) 0%, rgb(14, 77, 113) 100%);
-    min-height: 100vh;
-    height: auto;    
-    background-attachment: fixed;
-    font-size: 16px;
-    display: flex;
-    justify-content: center;
-
+  background: linear-gradient(220deg, rgb(4, 48, 142) 0%, rgb(14, 77, 113) 100%);
+  background-attachment: fixed;
+  display: flex;
+  justify-content: center;
 }
 
 .App {
-    width: 100vw;
-    background: url('/background.png'); 
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 100vh;
-    
+  width: 100vw;
+  background: url("/background.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.container {
+  margin-top: 3rem;
 }
 
 label {
-  color: #38CAF7;
+  color: #38caf7;
   font-size: 1.5rem;
-
 }
+
 .error {
   color: #fff;
-  background-color: rgba(231, 76, 60, 0.5); 
+  background-color: rgba(231, 76, 60, 0.5);
   padding: 10px 15px;
   border-radius: 8px;
   font-size: clamp(14px, 2vw, 18px);
@@ -42,147 +36,51 @@ label {
   text-align: center;
   width: min(90%, 400px);
   margin: 10px auto;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
-.step-container{
+
+.step-container {
   margin: 1.5rem;
 }
 
-.input-code{
+.input-code {
   width: 90%;
   padding: 12px 20px;
   margin: 15px auto;
-  box-sizing: border-box;
   border-radius: 8px;
   font-size: 16px;
   color: #333;
 }
 
-.btn-container{
+.btn-container {
   display: flex;
   justify-content: space-between;
   margin: 1rem;
-  
 }
 
-.btn-next {
-  background: linear-gradient(to right, #275466, #567B8A); /* Gradient from left (#275466) to right (#567B8A) */
+.btn-next,
+.btn-back,
+.btn-change {
+  background: linear-gradient(to right, #275466, #567b8a);
   color: #ffffff;
-  border: 2px solid #5C808F;
+  border: 2px solid #5c808f;
   font-size: medium;
   padding: 10px 15px;
   cursor: pointer;
 }
 
-.btn-back{
-    background: linear-gradient(to right, #373e41, #567B8A); /* Gradient from left (#275466) to right (#567B8A) */
-    color: #ffffff;
-    border: 2px solid #5C808F;
-    font-size: medium;
-    padding: 10px 15px;
-    cursor: pointer;
-
+.btn-back {
+  background: linear-gradient(to right, #373e41, #567b8a);
 }
-.btn-change{
-  background: linear-gradient(to right, #275466, #567B8A); /* Gradient from left (#275466) to right (#567B8A) */
-  color: #ffffff;
-  border: 2px solid #5C808F;
-  font-size: medium;
-  padding: 10px 15px;
-  cursor: pointer;
+
+.btn-change {
   margin: 2rem;
 }
 
-
-/* Radio buttons */
-.radio-container{
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-}
-
-.radio-button input {
-  appearance: none;
-}
-
-.radio-button {
-  padding: .3rem;
-  padding-right: .6rem;
-  border: 2px solid #5C808F; 
-  background: transparent;
-  color: #38CAF7; 
-  cursor: pointer;
-  font-size: clamp(14px, 2vw, 18px);
-
-}
-
-.radio-button:nth-child(2),
-.radio-button:nth-child(3),
-.radio-button:nth-child(4) {
-  border-left: none;
-}
-.radio-button:nth-child(1){
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
-}
-
-.radio-button:nth-child(4){
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
-}
-
-.radio-button.active, .radio-button:hover{
-  background: #5c808f;
-  color: white;
-}
-
-/* Slider */
-
-.slider {
-  -webkit-appearance: none;
-  width: 100%;
-  height: .5rem;
-  border-radius: 5px;
-  background: white;
-  outline: none;
-  -webkit-transition: .2s;
-  transition: opacity .2s;
-  margin: 1.5rem 0;
-}
-.slider-label{
-  color: white;
-  margin: 0 .5rem;
-  font-size: large;
-  font-weight: bold;
-}
-
-.slider-container{
-  display: flex;
-  align-items: center;
-  
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 25px;
-  height: 25px;
-  border-radius: 50%;
-  background: #38CAF7;
-  cursor: pointer;
-}
-
-/*Sound Selector page*/
-h4{
-  color:#38CAF7;
+h4 {
+  color: #38caf7;
   margin-left: 2rem;
 }
-
-
-/* Sound Card */
 
 .sound-container {
   margin: 1rem auto;
@@ -197,14 +95,14 @@ h4{
 }
 
 .playing {
-  border: 7px solid #38CAF7;
+  border-color: #38caf7;
 }
 
 .sound-img {
   width: 100%;
   height: 20%;
   object-fit: cover;
-  border-radius: 13px 13px 0 0; 
+  border-radius: 13px 13px 0 0;
 }
 
 .sound-title {
@@ -218,7 +116,7 @@ h4{
   background: rgba(0, 0, 0, 0.3);
   padding: 4px 8px;
   border-radius: 5px;
-  max-width: 80%; 
+  max-width: 80%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -229,16 +127,13 @@ h4{
   right: 5%;
   top: 50%;
   transform: translateY(-50%);
-  color: #38CAF7;
+  color: #38caf7;
 }
-
-
-
 
 .quotes h2 {
   opacity: 0.7;
   transition: opacity 0.5s, transform 0.5s;
-  color: #38CAF7;
+  color: #38caf7;
   width: 80%;
   margin: 3rem auto;
   text-align: center;
@@ -247,32 +142,29 @@ h4{
 .quotes .quote-active {
   opacity: 1;
   transform: scale(1.1);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* Add a glowing text shadow */
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
-
-/*SoundPlayer*/
-
-.soundPlayer{
+.soundPlayer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin: 0 auto;
-  border: 4px solid #38CAF7;
+  border: 4px solid #38caf7;
   width: 90%;
   cursor: pointer;
   border-radius: 13px;
 }
 
 .soundPlayer > .texts {
-  color: #38CAF7;
-  opacity: 0.8; 
+  color: #38caf7;
+  opacity: 0.8;
   margin-left: 20px;
   text-align: left;
 }
 
 .soundPlayer > .icon {
-  color: #38CAF7;
+  color: #38caf7;
   margin-right: 30px;
 }
 
@@ -280,9 +172,10 @@ h4{
   .sound-container {
     width: 90%;
     margin: 1rem auto;
-    overflow-y: auto;  
+    overflow-y: auto;
   }
-  .App{
+
+  .App {
     max-width: 490px;
   }
 }

@@ -1,5 +1,6 @@
 const { MongoClient, ServerApiVersion } = require("mongodb");
-require("dotenv").config({ path: "./config.env" });
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "config.env") });
 
 const client = new MongoClient(process.env.ATLAS_URI, {
   serverApi: {

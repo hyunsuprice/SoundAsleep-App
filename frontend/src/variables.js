@@ -1,53 +1,58 @@
-export const sounds = [
+export const SESSION_DURATION_SECONDS = 7200;
+
+export const soundscapeLibrary = [
   {
-    id: 1,
-    title: "Rain sound",
-    imageUrl: "./rain_umbrella.jpg",
-    audioUrl: "./rain sound.mp3",
-    isPlaying: false,
+    id: "rain",
+    title: "Rain Soundscape",
+    imageUrl: "/rain_umbrella.jpg",
+    audioUrl: "/rain sound.mp3",
   },
   {
-    id: 2,
-    title: "Underwater",
+    id: "underwater",
+    title: "Underwater Soundscape",
     imageUrl: "/underwater.jpg",
-    audioUrl: "./underwater.mp3",
-    isPlaying: false,
+    audioUrl: "/underwater.mp3",
   },
   {
-    id: 3,
-    title: "Singing Bowls",
+    id: "singing-bowls",
+    title: "Singing Bowls Soundscape",
     imageUrl: "/singingBowls.jpeg",
-    audioUrl: "./singing bowls.mp3",
-    isPlaying: false,
+    audioUrl: "/singing bowls.mp3",
   },
   {
-    id: 4,
-    title: "Birds",
+    id: "birds",
+    title: "Birds Soundscape",
     imageUrl: "/birds.jpg",
-    audioUrl: "./birds.mp3",
-    isPlaying: false,
+    audioUrl: "/birds.mp3",
   },
   {
-    id: 5,
-    title: "Crickets",
+    id: "crickets",
+    title: "Crickets Soundscape",
     imageUrl: "/crickets.jpg",
-    audioUrl: "./crickets.mp3",
-    isPlaying: false,
+    audioUrl: "/crickets.mp3",
   },
 ];
 
-export const moodSoundsList = {
-  Happy: ["Birds", "Rain sound", "Crickets"],
-  Stressed: ["Rain sound", "Underwater", "Singing Bowls"],
-  Calm: ["Rain sound", "Singing Bowls", "Crickets"],
-  Sad: ["Rain sound", "Underwater", "Singing Bowls"],
+const participantSoundscapeAssignments = {
+  "001": ["rain", "underwater"],
+  "002": ["singing-bowls", "birds"],
+  "003": ["crickets"],
 };
 
-export const moodMessages = {
-  Stressed:
-    "Sorry to hear that you're feeling stressed.",
-  Sad: "Sorry to hear that you're feeling sad.",
-  Happy:
-    "Good to hear that you're feeling happy.",
-  Calm: "Good to hear that you're feeling calm.",
-};
+export function getSoundscapeById(soundscapeId) {
+  return soundscapeLibrary.find((soundscape) => soundscape.id === soundscapeId);
+}
+
+export function getSoundscapesForParticipant(participantId) {
+  const normalizedParticipantId = participantId.trim().toLowerCase();
+  const assignedSoundscapeIds =
+    participantSoundscapeAssignments[normalizedParticipantId] || [];
+
+  return assignedSoundscapeIds
+    .map((soundscapeId) => getSoundscapeById(soundscapeId))
+    .filter(Boolean)
+    .map((soundscape) => ({
+      ...soundscape,
+      isPlaying: false,
+    }));
+}

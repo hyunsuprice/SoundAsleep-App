@@ -1,112 +1,120 @@
 import { useState } from "react";
 import "./App.css";
-import postData from "../api.js";
 import CodeField from "./components/CodeField.jsx";
-import DayRating from "./components/DayRating.jsx";
-import RelaxSlider from "./components/RelaxSlider.jsx";
-import MoodSelector from "./components/MoodSelector.jsx";
 import SoundSelector from "./components/SoundSelector.jsx";
 import PlayingPage from "./components/PlayingPage.jsx";
 
+const SCREENS = {
+  ENTER_ID: "enter-id",
+  SELECT_SOUND: "select-sound",
+  LISTEN: "listen",
+};
+
 function App() {
-  const [step, setStep] = useState(1);
-  const [code, setCode] = useState("");
-  const [error, setError] = useState(false);
-  const [formData, setFormData] = useState({
-    day: "Productive",
-    relaxation: 5,
-    mood: "Happy",
-    selectedSound: null,
-    dateCreated: new Date(),
-  });
+  const [screen, setScreen] = useState(SCREENS.ENTER_ID);
+  const [participantId, setParticipantId] = useState("");
+  const [selectedSoundscapeId, setSelectedSoundscapeId] = useState(null);
+  const [error, setError] = useState("");
 
-  const handleChange = (key, value) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+  const goToEnterId = () => {
+    setScreen(SCREENS.ENTER_ID);
+    setError("");
   };
 
-  const handlePost = (e) => {
-    e.preventDefault();
-
-    if (!formData.selectedSound) {
-      setError(true);
-    } else {
-      console.log("submitting");
-      postData(code, formData);
-      setStep(6);
-      setError(false);
+  const goToSelectSound = () => {
+    if (!participantId.trim()) {
+      setError("Please enter a code");
+      return;
     }
+
+    setSelectedSoundscapeId(null);
+    setScreen(SCREENS.SELECT_SOUND);
+    setError("");
   };
-  const handleNext = () => {
-    if (code === "") {
-      setError(true);
-    } else {
-      setStep((prev) => prev + 1);
-      setError(false);
+
+  const goToListen = () => {
+    if (!selectedSoundscapeId) {
+      setError("Please select a sound before continuing");
+      return;
+    }
+
+    setScreen(SCREENS.LISTEN);
+    setError("");
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    if (screen === SCREENS.SELECT_SOUND) {
+      goToListen();
     }
   };
 
   return (
     <div className="App">
-      <div className="container mt-5">
-        <form onSubmit={handlePost}>
-          {step === 1 && (
-            <>
-              {error && <p className="error">Please Enter a code</p>}
-              <CodeField code={code} setCode={setCode} />
-            </>
-          )}
-          {step === 2 && (
-            <DayRating day={formData.day} handleChange={handleChange} />
-          )}
-          {step === 3 && (
-            <RelaxSlider
-              relax={formData.relaxation}
-              handleChange={handleChange}
+      <div className="container">
+        <form onSubmit={handleSubmit}>
+          {error && <p className="error">{error}</p>}
+
+          {screen === SCREENS.ENTER_ID && (
+            <CodeField
+              code={participantId}
+              onCodeChange={setParticipantId}
             />
           )}
-          {step === 4 && (
-            <MoodSelector mood={formData.mood} handleChange={handleChange} />
+
+          {screen === SCREENS.SELECT_SOUND && (
+            <SoundSelector
+              participantId={participantId.trim()}
+              onSelectSoundscape={setSelectedSoundscapeId}
+            />
           )}
 
-          {step === 5 && (
+          {screen === SCREENS.LISTEN && (
             <div>
-              {error && (
-                <p className="error">Please select a sound before submitting</p>
-              )}
-
-              <SoundSelector mood={formData.mood} handleChange={handleChange} />
-            </div>
-          )}
-
-          {step === 6 && (
-            <div>
-              <PlayingPage sound={formData.selectedSound} />
-              <button className="btn-change" onClick={() => setStep(5)}>
+              <PlayingPage
+                participantId={participantId.trim()}
+                soundscapeId={selectedSoundscapeId}
+              />
+              <button
+                className="btn-change"
+                type="button"
+                onClick={() => setScreen(SCREENS.SELECT_SOUND)}
+              >
                 Change Sound
               </button>
             </div>
           )}
-          <div className="btn-container">
-            {step > 1 && step < 6 && (
-              <button
-                className="btn-back"
-                type="button"
-                onClick={() => setStep((prev) => prev - 1)}
-              >
-                Back
-              </button>
-            )}
-            {step < 5 && (
-              <button className="btn-next" type="button" onClick={handleNext}>
-                Next
-              </button>
-            )}
-            {step === 5 && (
-              <button className="btn-next" type="submit">
-                Submit
-              </button>
-            )}
-          </div>
+
+          {screen !== SCREENS.LISTEN && (
+            <div className="btn-container">
+              {screen === SCREENS.SELECT_SOUND && (
+                <button
+                  className="btn-back"
+                  type="button"
+                  onClick={goToEnterId}
+                >
+                  Back
+                </button>
+              )}
+
+              {screen === SCREENS.ENTER_ID && (
+                <button
+                  className="btn-next"
+                  type="button"
+                  onClick={goToSelectSound}
+                >
+                  Next
+                </button>
+              )}
+
+              {screen === SCREENS.SELECT_SOUND && (
+                <button className="btn-next" type="submit">
+                  Continue
+                </button>
+              )}
+            </div>
+          )}
         </form>
       </div>
     </div>

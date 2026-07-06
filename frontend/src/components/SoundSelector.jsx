@@ -1,36 +1,37 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import "../App.css";
-import {
-  sounds as initialSounds,
-  moodSoundsList,
-  moodMessages,
-} from "../variables.js";
+import { getSoundscapesForParticipant } from "../variables.js";
 import SoundCard from "./SoundCard.jsx";
 
-export default function SoundSelector({ mood, handleChange }) {
-  const allowedTitles = moodSoundsList[mood] || [];
-  const filteredSounds = initialSounds.filter((sound) =>
-    allowedTitles.includes(sound.title)
+export default function SoundSelector({ participantId, onSelectSoundscape }) {
+  const [availableSoundscapes, setAvailableSoundscapes] = useState(() =>
+    getSoundscapesForParticipant(participantId)
   );
 
-  const [recommendedSounds, setRecommendedSounds] = useState(filteredSounds);
+  useEffect(() => {
+    setAvailableSoundscapes(getSoundscapesForParticipant(participantId));
+  }, [participantId]);
 
   function handleToggle(targetSound) {
-    const updatedSounds = recommendedSounds.map((sound) =>
-      sound.id === targetSound.id
-        ? { ...sound, isPlaying: !sound.isPlaying }
-        : { ...sound, isPlaying: false }
+    setAvailableSoundscapes((currentSounds) =>
+      currentSounds.map((sound) =>
+        sound.id === targetSound.id
+          ? { ...sound, isPlaying: !sound.isPlaying }
+          : { ...sound, isPlaying: false }
+      )
     );
-    setRecommendedSounds(updatedSounds);
-    handleChange("selectedSound", targetSound.title);
+    onSelectSoundscape(targetSound.id);
   }
 
   return (
     <div className="step-container">
-      <h4>{moodMessages[mood]}</h4>
-      <h4>We suggest three sounds to have a good night sleep:</h4>
+      <h4>Choose your soundscape:</h4>
 
-      {recommendedSounds.map((sound) => (
+      {availableSoundscapes.length === 0 && (
+        <p className="error">No soundscapes found for this participant ID.</p>
+      )}
+
+      {availableSoundscapes.map((sound) => (
         <SoundCard
           key={sound.id}
           sound={sound}
