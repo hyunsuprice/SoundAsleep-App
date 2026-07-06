@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import "../App.css";
 import { getSoundscapesForParticipant } from "../variables.js";
 import SoundCard from "./SoundCard.jsx";
 
-export default function SoundSelector({ participantId, handleChange }) {
+export default function SoundSelector({ participantId, onSelectSoundscape }) {
   const [availableSoundscapes, setAvailableSoundscapes] = useState(() =>
     getSoundscapesForParticipant(participantId)
   );
@@ -13,13 +13,14 @@ export default function SoundSelector({ participantId, handleChange }) {
   }, [participantId]);
 
   function handleToggle(targetSound) {
-    const updatedSounds = availableSoundscapes.map((sound) =>
-      sound.id === targetSound.id
-        ? { ...sound, isPlaying: !sound.isPlaying }
-        : { ...sound, isPlaying: false }
+    setAvailableSoundscapes((currentSounds) =>
+      currentSounds.map((sound) =>
+        sound.id === targetSound.id
+          ? { ...sound, isPlaying: !sound.isPlaying }
+          : { ...sound, isPlaying: false }
+      )
     );
-    setAvailableSoundscapes(updatedSounds);
-    handleChange("selectedSoundscapeId", targetSound.id);
+    onSelectSoundscape(targetSound.id);
   }
 
   return (

@@ -1,8 +1,11 @@
-import React, { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlayCircle, faPauseCircle } from "@fortawesome/free-solid-svg-icons";
 import { postPlaybackEvent } from "../../api.js";
-import { getSoundscapeById } from "../variables.js";
+import {
+  getSoundscapeById,
+  SESSION_DURATION_SECONDS,
+} from "../variables.js";
 
 function createSessionId() {
   if (crypto?.randomUUID) {
@@ -12,9 +15,20 @@ function createSessionId() {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function formatTime(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(secs).padStart(2, "0")}`;
+}
+
 export default function SoundPlayer({ participantId, soundscapeId }) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(10); // For testing, use a shorter time
+  const [remainingTime, setRemainingTime] = useState(SESSION_DURATION_SECONDS);
   const audioRef = useRef(null);
   const sessionIdRef = useRef(createSessionId());
   const sessionStartedAtRef = useRef(null);
@@ -24,22 +38,11 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   const sessionEndedRef = useRef(false);
   const soundscape = getSoundscapeById(soundscapeId);
 
-  // Function to format the time to hh:mm:ss
-  function formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-      2,
-      "0"
-    )}:${String(secs).padStart(2, "0")}`;
-  }
-
-  const getAudioTimeSeconds = useCallback(function getAudioTimeSeconds() {
+  const getAudioTimeSeconds = useCallback(() => {
     return Number((audioRef.current?.currentTime || 0).toFixed(2));
   }, []);
 
-  const getTotalPlayedSeconds = useCallback(function getTotalPlayedSeconds() {
+  const getTotalPlayedSeconds = useCallback(() => {
     let totalPlayedSeconds = totalPlayedSecondsRef.current;
 
     if (playStartedAtRef.current) {
@@ -49,23 +52,23 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     return Number(totalPlayedSeconds.toFixed(2));
   }, []);
 
-  const trackEvent = useCallback(function trackEvent(eventType, extraData = {}) {
-    const event = {
-      sessionId: sessionIdRef.current,
-      participantId,
-      soundscapeId,
-      eventType,
-      audioTimeSeconds: getAudioTimeSeconds(),
-      totalPlayedSeconds: getTotalPlayedSeconds(),
-      timestamp: new Date().toISOString(),
-      ...extraData,
-    };
+  const trackEvent = useCallback(
+    (eventType, extraData = {}) => {
+      postPlaybackEvent({
+        sessionId: sessionIdRef.current,
+        participantId,
+        soundscapeId,
+        eventType,
+        audioTimeSeconds: getAudioTimeSeconds(),
+        totalPlayedSeconds: getTotalPlayedSeconds(),
+        timestamp: new Date().toISOString(),
+        ...extraData,
+      });
+    },
+    [getAudioTimeSeconds, getTotalPlayedSeconds, participantId, soundscapeId]
+  );
 
-    console.log("Playback event:", event);
-    postPlaybackEvent(event);
-  }, [getAudioTimeSeconds, getTotalPlayedSeconds, participantId, soundscapeId]);
-
-  const ensureSessionStarted = useCallback(function ensureSessionStarted() {
+  const ensureSessionStarted = useCallback(() => {
     if (sessionStartedAtRef.current) {
       return;
     }
@@ -76,7 +79,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     });
   }, [trackEvent]);
 
-  const addCurrentPlaySegment = useCallback(function addCurrentPlaySegment() {
+  const addCurrentPlaySegment = useCallback(() => {
     if (!playStartedAtRef.current) {
       return;
     }
@@ -86,19 +89,39 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     playStartedAtRef.current = null;
   }, []);
 
-  const endSession = useCallback(function endSession(reason) {
-    if (!sessionStartedAtRef.current || sessionEndedRef.current) {
-      return;
+  const endSession = useCallback(
+    (reason) => {
+      if (!sessionStartedAtRef.current || sessionEndedRef.current) {
+        return;
+      }
+
+      addCurrentPlaySegment();
+      sessionEndedRef.current = true;
+      trackEvent("session_ended", {
+        reason,
+        sessionStartedAt: sessionStartedAtRef.current,
+        sessionEndedAt: new Date().toISOString(),
+      });
+    },
+    [addCurrentPlaySegment, trackEvent]
+  );
+
+  const resetPlayer = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
+    setRemainingTime(SESSION_DURATION_SECONDS);
+    setIsPlaying(false);
+  }, []);
+
+  const handleTimerComplete = useCallback(() => {
     addCurrentPlaySegment();
-    sessionEndedRef.current = true;
-    trackEvent("session_ended", {
-      reason,
-      sessionStartedAt: sessionStartedAtRef.current,
-      sessionEndedAt: new Date().toISOString(),
-    });
-  }, [addCurrentPlaySegment, trackEvent]);
+    trackEvent("timer_complete");
+    endSession("timer_complete");
+    resetPlayer();
+  }, [addCurrentPlaySegment, endSession, resetPlayer, trackEvent]);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -113,38 +136,28 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   }, [isPlaying]);
 
   useEffect(() => {
-    if (isPlaying) {
-      const interval = setInterval(() => {
-        setRemainingTime((prevTime) => {
-          if (prevTime > 0) {
-            return prevTime - 1; // Decrease by 1 second
-          } else {
-            clearInterval(interval); // Stop the countdown when it reaches 0
-            if (audioRef.current) {
-              audioRef.current.pause(); // Pause the audio
-            }
-            addCurrentPlaySegment();
-            trackEvent("timer_complete");
-            endSession("timer_complete");
-            if (audioRef.current) {
-              audioRef.current.currentTime = 0; // Reset audio to the beginning
-            }
-            setRemainingTime(10)
-            setIsPlaying(false)
-            return 0;
-          }
-        });
-      }, 1000); // Update every second
-
-      // Cleanup the interval on component unmount or pause
-      return () => clearInterval(interval);
+    if (!isPlaying) {
+      return;
     }
-  }, [addCurrentPlaySegment, endSession, isPlaying, trackEvent]);
 
-  // Set the audio to loop, but remove loop when the countdown reaches 0
+    const interval = setInterval(() => {
+      setRemainingTime((prevTime) => {
+        if (prevTime > 1) {
+          return prevTime - 1;
+        }
+
+        clearInterval(interval);
+        handleTimerComplete();
+        return 0;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [handleTimerComplete, isPlaying]);
+
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.loop = true; // This makes the audio loop automatically
+      audioRef.current.loop = true;
     }
   }, []);
 
@@ -154,7 +167,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     };
   }, [endSession]);
 
-  // Toggle play/pause
   function onToggle() {
     if (isPlaying) {
       addCurrentPlaySegment();
@@ -170,14 +182,12 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     setIsPlaying(true);
   }
 
-  // Stop the countdown when the audio finishes
-  const onAudioEnded = () => {
+  function onAudioEnded() {
     addCurrentPlaySegment();
     trackEvent("ended");
     endSession("audio_ended");
-    setIsPlaying(false);
-    setRemainingTime(7200); // Reset time to 2 hours when the audio finishes
-  };
+    resetPlayer();
+  }
 
   if (!soundscape) {
     return <p className="error">Selected soundscape could not be found.</p>;
@@ -188,7 +198,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       <div className="texts">
         <p>{isPlaying ? "Playing" : "Paused"}</p>
         <h3>{soundscape.title}</h3>
-        <p>{formatTime(remainingTime)}</p> {/* Display remaining time */}
+        <p>{formatTime(remainingTime)}</p>
       </div>
       <FontAwesomeIcon
         size="3x"
@@ -198,7 +208,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       <audio
         ref={audioRef}
         src={soundscape.audioUrl}
-        onEnded={onAudioEnded} // Handle when audio ends
+        onEnded={onAudioEnded}
       />
     </div>
   );

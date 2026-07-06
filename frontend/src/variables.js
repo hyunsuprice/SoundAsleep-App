@@ -1,3 +1,5 @@
+export const SESSION_DURATION_SECONDS = 7200;
+
 export const soundscapeLibrary = [
   {
     id: "rain",
@@ -31,11 +33,15 @@ export const soundscapeLibrary = [
   },
 ];
 
-export const participantSoundscapeAssignments = {
+const participantSoundscapeAssignments = {
   "001": ["rain", "underwater"],
   "002": ["singing-bowls", "birds"],
   "003": ["crickets"],
 };
+
+export function getSoundscapeById(soundscapeId) {
+  return soundscapeLibrary.find((soundscape) => soundscape.id === soundscapeId);
+}
 
 export function getSoundscapesForParticipant(participantId) {
   const normalizedParticipantId = participantId.trim().toLowerCase();
@@ -47,11 +53,6 @@ export function getSoundscapesForParticipant(participantId) {
     .filter(Boolean)
     .map((soundscape) => ({
       ...soundscape,
-      participantId: normalizedParticipantId,
       isPlaying: false,
     }));
-}
-
-export function getSoundscapeById(soundscapeId) {
-  return soundscapeLibrary.find((soundscape) => soundscape.id === soundscapeId);
 }

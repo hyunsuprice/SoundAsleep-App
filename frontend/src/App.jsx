@@ -4,104 +4,111 @@ import CodeField from "./components/CodeField.jsx";
 import SoundSelector from "./components/SoundSelector.jsx";
 import PlayingPage from "./components/PlayingPage.jsx";
 
+const SCREENS = {
+  ENTER_ID: "enter-id",
+  SELECT_SOUND: "select-sound",
+  LISTEN: "listen",
+};
+
 function App() {
-  const [screen, setScreen] = useState("enter-id");
-  const [code, setCode] = useState("");
-  const [error, setError] = useState(false);
+  const [screen, setScreen] = useState(SCREENS.ENTER_ID);
+  const [participantId, setParticipantId] = useState("");
   const [selectedSoundscapeId, setSelectedSoundscapeId] = useState(null);
+  const [error, setError] = useState("");
 
-  const handleChange = (key, value) => {
-    if (key === "selectedSoundscapeId") {
-      setSelectedSoundscapeId(value);
-    }
+  const goToEnterId = () => {
+    setScreen(SCREENS.ENTER_ID);
+    setError("");
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (screen === "enter-id") {
-      handleNext();
+  const goToSelectSound = () => {
+    if (!participantId.trim()) {
+      setError("Please enter a code");
       return;
     }
 
+    setSelectedSoundscapeId(null);
+    setScreen(SCREENS.SELECT_SOUND);
+    setError("");
+  };
+
+  const goToListen = () => {
     if (!selectedSoundscapeId) {
-      setError(true);
+      setError("Please select a sound before continuing");
       return;
     }
 
-    setScreen("listen");
-    setError(false);
+    setScreen(SCREENS.LISTEN);
+    setError("");
   };
 
-  const handleNext = () => {
-    if (code.trim() === "") {
-      setError(true);
-    } else {
-      setSelectedSoundscapeId(null);
-      setScreen("select-sound");
-      setError(false);
-    }
-  };
+  const handleSubmit = (event) => {
+    event.preventDefault();
 
-  const handleBack = () => {
-    if (screen === "select-sound") {
-      setScreen("enter-id");
-      setError(false);
+    if (screen === SCREENS.SELECT_SOUND) {
+      goToListen();
     }
   };
 
   return (
     <div className="App">
-      <div className="container mt-5">
+      <div className="container">
         <form onSubmit={handleSubmit}>
-          {screen === "enter-id" && (
-            <>
-              {error && <p className="error">Please Enter a code</p>}
-              <CodeField code={code} setCode={setCode} />
-            </>
+          {error && <p className="error">{error}</p>}
+
+          {screen === SCREENS.ENTER_ID && (
+            <CodeField
+              code={participantId}
+              onCodeChange={setParticipantId}
+            />
           )}
 
-          {screen === "select-sound" && (
-            <div>
-              {error && (
-                <p className="error">Please select a sound before submitting</p>
-              )}
-
-              <SoundSelector
-                participantId={code.trim()}
-                handleChange={handleChange}
-              />
-            </div>
+          {screen === SCREENS.SELECT_SOUND && (
+            <SoundSelector
+              participantId={participantId.trim()}
+              onSelectSoundscape={setSelectedSoundscapeId}
+            />
           )}
 
-          {screen === "listen" && (
+          {screen === SCREENS.LISTEN && (
             <div>
               <PlayingPage
-                participantId={code.trim()}
+                participantId={participantId.trim()}
                 soundscapeId={selectedSoundscapeId}
               />
               <button
                 className="btn-change"
                 type="button"
-                onClick={() => setScreen("select-sound")}
+                onClick={() => setScreen(SCREENS.SELECT_SOUND)}
               >
                 Change Sound
               </button>
             </div>
           )}
-          {screen !== "listen" && (
+
+          {screen !== SCREENS.LISTEN && (
             <div className="btn-container">
-              {screen === "select-sound" && (
-                <button className="btn-back" type="button" onClick={handleBack}>
+              {screen === SCREENS.SELECT_SOUND && (
+                <button
+                  className="btn-back"
+                  type="button"
+                  onClick={goToEnterId}
+                >
                   Back
                 </button>
               )}
-              {screen === "enter-id" && (
-                <button className="btn-next" type="button" onClick={handleNext}>
+
+              {screen === SCREENS.ENTER_ID && (
+                <button
+                  className="btn-next"
+                  type="button"
+                  onClick={goToSelectSound}
+                >
                   Next
                 </button>
               )}
-              {screen === "select-sound" && (
+
+              {screen === SCREENS.SELECT_SOUND && (
                 <button className="btn-next" type="submit">
                   Continue
                 </button>
