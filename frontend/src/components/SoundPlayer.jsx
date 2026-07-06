@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlayCircle, faPauseCircle } from "@fortawesome/free-solid-svg-icons";
+import { postPlaybackEvent } from "../../api.js";
 import { getSoundscapeById } from "../variables.js";
 
 export default function SoundPlayer({ participantId, soundscapeId }) {
@@ -51,6 +52,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     };
 
     console.log("Playback event:", event);
+    postPlaybackEvent(event);
   }, [getAudioTimeSeconds, getTotalPlayedSeconds, participantId, soundscapeId]);
 
   const ensureSessionStarted = useCallback(function ensureSessionStarted() {
@@ -110,11 +112,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
             clearInterval(interval); // Stop the countdown when it reaches 0
             if (audioRef.current) {
               audioRef.current.pause(); // Pause the audio
-              audioRef.current.currentTime = 0; // Reset audio to the beginning
             }
             addCurrentPlaySegment();
             trackEvent("timer_complete");
             endSession("timer_complete");
+            if (audioRef.current) {
+              audioRef.current.currentTime = 0; // Reset audio to the beginning
+            }
             setRemainingTime(10)
             setIsPlaying(false)
             return 0;
