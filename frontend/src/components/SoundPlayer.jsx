@@ -4,10 +4,19 @@ import { faPlayCircle, faPauseCircle } from "@fortawesome/free-solid-svg-icons";
 import { postPlaybackEvent } from "../../api.js";
 import { getSoundscapeById } from "../variables.js";
 
+function createSessionId() {
+  if (crypto?.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function SoundPlayer({ participantId, soundscapeId }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [remainingTime, setRemainingTime] = useState(10); // For testing, use a shorter time
   const audioRef = useRef(null);
+  const sessionIdRef = useRef(createSessionId());
   const sessionStartedAtRef = useRef(null);
   const playStartedAtRef = useRef(null);
   const totalPlayedSecondsRef = useRef(0);
@@ -42,6 +51,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
 
   const trackEvent = useCallback(function trackEvent(eventType, extraData = {}) {
     const event = {
+      sessionId: sessionIdRef.current,
       participantId,
       soundscapeId,
       eventType,

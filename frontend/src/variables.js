@@ -1,55 +1,57 @@
-export const soundscapes = [
+export const soundscapeLibrary = [
   {
-    id: "001-rain",
-    participantId: "001",
+    id: "rain",
     title: "Rain Soundscape",
-    imageUrl: "./rain_umbrella.jpg",
-    audioUrl: "./rain sound.mp3",
-    isPlaying: false,
+    imageUrl: "/rain_umbrella.jpg",
+    audioUrl: "/rain sound.mp3",
   },
   {
-    id: "001-underwater",
-    participantId: "001",
+    id: "underwater",
     title: "Underwater Soundscape",
     imageUrl: "/underwater.jpg",
-    audioUrl: "./underwater.mp3",
-    isPlaying: false,
+    audioUrl: "/underwater.mp3",
   },
   {
-    id: "002-bowls",
-    participantId: "002",
+    id: "singing-bowls",
     title: "Singing Bowls Soundscape",
     imageUrl: "/singingBowls.jpeg",
-    audioUrl: "./singing bowls.mp3",
-    isPlaying: false,
+    audioUrl: "/singing bowls.mp3",
   },
   {
-    id: "002-birds",
-    participantId: "002",
+    id: "birds",
     title: "Birds Soundscape",
     imageUrl: "/birds.jpg",
-    audioUrl: "./birds.mp3",
-    isPlaying: false,
+    audioUrl: "/birds.mp3",
   },
   {
-    id: "demo-crickets",
-    participantId: "demo",
+    id: "crickets",
     title: "Crickets Soundscape",
     imageUrl: "/crickets.jpg",
-    audioUrl: "./crickets.mp3",
-    isPlaying: false,
+    audioUrl: "/crickets.mp3",
   },
 ];
 
+export const participantSoundscapeAssignments = {
+  "001": ["rain", "underwater"],
+  "002": ["singing-bowls", "birds"],
+  "003": ["crickets"],
+};
+
 export function getSoundscapesForParticipant(participantId) {
   const normalizedParticipantId = participantId.trim().toLowerCase();
+  const assignedSoundscapeIds =
+    participantSoundscapeAssignments[normalizedParticipantId] || [];
 
-  return soundscapes.filter(
-    (soundscape) =>
-      soundscape.participantId.toLowerCase() === normalizedParticipantId
-  );
+  return assignedSoundscapeIds
+    .map((soundscapeId) => getSoundscapeById(soundscapeId))
+    .filter(Boolean)
+    .map((soundscape) => ({
+      ...soundscape,
+      participantId: normalizedParticipantId,
+      isPlaying: false,
+    }));
 }
 
 export function getSoundscapeById(soundscapeId) {
-  return soundscapes.find((soundscape) => soundscape.id === soundscapeId);
+  return soundscapeLibrary.find((soundscape) => soundscape.id === soundscapeId);
 }

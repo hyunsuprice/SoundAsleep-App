@@ -9,6 +9,7 @@ postRoutes.route("/playback-events").post(async (request, response) => {
     let db = database.getDb();
 
     const playbackEvent = {
+      sessionId: request.body.sessionId || null,
       participantId: request.body.participantId,
       soundscapeId: request.body.soundscapeId,
       eventType: request.body.eventType,
