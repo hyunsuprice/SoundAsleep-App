@@ -1,42 +1,34 @@
-export const SESSION_DURATION_SECONDS = 7200;
-
 export const soundscapeLibrary = [
   {
-    id: "rain",
-    title: "Rain Soundscape",
+    id: "alex_01",
+    title: "Alex Emil Soundscape",
     imageUrl: "/rain_umbrella.jpg",
-    audioUrl: "/rain sound.mp3",
+    audioUrl: "/alex_emil.mp3",
   },
   {
-    id: "underwater",
-    title: "Underwater Soundscape",
+    id: "alex_02",
+    title: "Alex Hyun Su Soundscape",
     imageUrl: "/underwater.jpg",
-    audioUrl: "/underwater.mp3",
+    audioUrl: "/alex_hyunsu.mp3",
   },
   {
-    id: "singing-bowls",
-    title: "Singing Bowls Soundscape",
+    id: "anya_01",
+    title: "Anya Hyun Su Soundscape",
     imageUrl: "/singingBowls.jpeg",
-    audioUrl: "/singing bowls.mp3",
+    audioUrl: "/anya_hyunsu.mp3",
   },
   {
-    id: "birds",
-    title: "Birds Soundscape",
+    id: "raphael_01",
+    title: "Raphael Emil Soundscape",
     imageUrl: "/birds.jpg",
-    audioUrl: "/birds.mp3",
-  },
-  {
-    id: "crickets",
-    title: "Crickets Soundscape",
-    imageUrl: "/crickets.jpg",
-    audioUrl: "/crickets.mp3",
+    audioUrl: "/raphael_emil.mp3",
   },
 ];
 
 const participantSoundscapeAssignments = {
-  "001": ["rain", "underwater"],
-  "002": ["singing-bowls", "birds"],
-  "003": ["crickets"],
+  "001": ["alex_01", "alex_02"],
+  "002": ["anya_01"],
+  "003": ["raphael_01"],
 };
 
 export function getSoundscapeById(soundscapeId) {
