@@ -1,10 +1,34 @@
 import axios from "axios";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV
-    ? "http://localhost:3000"
-    : "https://soundasleep-app.onrender.com");
+const PRODUCTION_API_URL = "https://soundasleep-app.onrender.com";
+const DEVELOPMENT_API_URL = "http://localhost:3000";
+
+function normalizeApiUrl(url) {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  return trimmed.replace(/^(https?:\/\/)(?:https?:\/\/)+/i, "$1");
+}
+
+function getApiUrl() {
+  const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+
+  if (configuredUrl) {
+    const normalizedUrl = normalizeApiUrl(configuredUrl);
+    const isLocalhost = /localhost|127\.0\.0\.1/i.test(normalizedUrl);
+
+    if (!import.meta.env.DEV && isLocalhost) {
+      console.warn(
+        "Ignoring localhost VITE_API_URL in production. Using production API instead."
+      );
+      return PRODUCTION_API_URL;
+    }
+
+    return normalizedUrl;
+  }
+
+  return import.meta.env.DEV ? DEVELOPMENT_API_URL : PRODUCTION_API_URL;
+}
+
+const API_URL = getApiUrl();
 
 export async function postPlaybackEvent(event) {
   try {
