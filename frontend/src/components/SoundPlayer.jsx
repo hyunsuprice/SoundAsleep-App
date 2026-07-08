@@ -45,13 +45,14 @@ function getRemainingSeconds(audio) {
   return Math.max(0, duration - audio.currentTime);
 }
 
-function probeAudioDuration(audio) {
+function probeAudioDuration(audio, isProbingRef) {
   if (getValidDuration(audio) != null) {
     return Promise.resolve(getValidDuration(audio));
   }
 
   return new Promise((resolve) => {
     let settled = false;
+    isProbingRef.current = true;
 
     const finish = () => {
       if (settled) {
@@ -67,6 +68,7 @@ function probeAudioDuration(audio) {
       cleanup();
       audio.pause();
       audio.currentTime = 0;
+      isProbingRef.current = false;
       resolve(duration);
     };
 
@@ -89,6 +91,7 @@ function probeAudioDuration(audio) {
         cleanup();
         audio.pause();
         audio.currentTime = 0;
+        isProbingRef.current = false;
         resolve(getValidDuration(audio));
       }
     }, 3000);
@@ -97,14 +100,18 @@ function probeAudioDuration(audio) {
 
 export default function SoundPlayer({ participantId, soundscapeId }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [remainingTime, setRemainingTime] = useState(null);
   const audioRef = useRef(null);
   const sessionIdRef = useRef(createSessionId());
   const sessionStartedAtRef = useRef(null);
-  const playStartedAtRef = useRef(null);
+  const segmentStartAudioTimeRef = useRef(null);
   const totalPlayedSecondsRef = useRef(0);
-  const hasPlayedRef = useRef(false);
+  const hasStartedPlaybackRef = useRef(false);
   const sessionEndedRef = useRef(false);
+  const isProbingRef = useRef(false);
+  const isBufferingRef = useRef(false);
+  const isPlayingIntentRef = useRef(false);
   const soundscape = getSoundscapeById(soundscapeId);
 
   const syncRemainingTime = useCallback(() => {
@@ -117,9 +124,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
 
   const getTotalPlayedSeconds = useCallback(() => {
     let totalPlayedSeconds = totalPlayedSecondsRef.current;
+    const audio = audioRef.current;
 
-    if (playStartedAtRef.current) {
-      totalPlayedSeconds += (Date.now() - playStartedAtRef.current) / 1000;
+    if (audio && segmentStartAudioTimeRef.current != null) {
+      totalPlayedSeconds += Math.max(
+        0,
+        audio.currentTime - segmentStartAudioTimeRef.current
+      );
     }
 
     return Number(totalPlayedSeconds.toFixed(2));
@@ -141,6 +152,18 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     [getAudioTimeSeconds, getTotalPlayedSeconds, participantId, soundscapeId]
   );
 
+  const finalizeCurrentSegment = useCallback(() => {
+    const audio = audioRef.current;
+
+    if (audio && segmentStartAudioTimeRef.current != null) {
+      totalPlayedSecondsRef.current += Math.max(
+        0,
+        audio.currentTime - segmentStartAudioTimeRef.current
+      );
+      segmentStartAudioTimeRef.current = null;
+    }
+  }, []);
+
   const ensureSessionStarted = useCallback(() => {
     if (sessionStartedAtRef.current) {
       return;
@@ -152,23 +175,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     });
   }, [trackEvent]);
 
-  const addCurrentPlaySegment = useCallback(() => {
-    if (!playStartedAtRef.current) {
-      return;
-    }
-
-    totalPlayedSecondsRef.current +=
-      (Date.now() - playStartedAtRef.current) / 1000;
-    playStartedAtRef.current = null;
-  }, []);
-
   const endSession = useCallback(
     (reason) => {
       if (!sessionStartedAtRef.current || sessionEndedRef.current) {
         return;
       }
 
-      addCurrentPlaySegment();
+      finalizeCurrentSegment();
       sessionEndedRef.current = true;
       trackEvent("session_ended", {
         reason,
@@ -176,7 +189,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
         sessionEndedAt: new Date().toISOString(),
       });
     },
-    [addCurrentPlaySegment, trackEvent]
+    [finalizeCurrentSegment, trackEvent]
   );
 
   const resetPlayer = useCallback(() => {
@@ -187,17 +200,54 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       audio.currentTime = 0;
     }
 
+    segmentStartAudioTimeRef.current = null;
+    isBufferingRef.current = false;
+    isPlayingIntentRef.current = false;
+    setIsBuffering(false);
     syncRemainingTime();
     setIsPlaying(false);
   }, [syncRemainingTime]);
 
+  const handlePlaybackStarted = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || isProbingRef.current || !isPlayingIntentRef.current) {
+      return;
+    }
+
+    if (isBufferingRef.current) {
+      isBufferingRef.current = false;
+      setIsBuffering(false);
+      trackEvent("buffering_end");
+    }
+
+    ensureSessionStarted();
+    segmentStartAudioTimeRef.current = audio.currentTime;
+    trackEvent(hasStartedPlaybackRef.current ? "resume" : "play");
+    hasStartedPlaybackRef.current = true;
+  }, [ensureSessionStarted, trackEvent]);
+
+  const handleBuffering = useCallback(() => {
+    if (isProbingRef.current || !isPlayingIntentRef.current) {
+      return;
+    }
+
+    if (!isBufferingRef.current) {
+      isBufferingRef.current = true;
+      setIsBuffering(true);
+      trackEvent("buffering");
+    }
+  }, [trackEvent]);
+
   useEffect(() => {
     sessionIdRef.current = createSessionId();
     sessionStartedAtRef.current = null;
-    playStartedAtRef.current = null;
+    segmentStartAudioTimeRef.current = null;
     totalPlayedSecondsRef.current = 0;
-    hasPlayedRef.current = false;
+    hasStartedPlaybackRef.current = false;
     sessionEndedRef.current = false;
+    isBufferingRef.current = false;
+    isPlayingIntentRef.current = false;
+    setIsBuffering(false);
     setIsPlaying(false);
     setRemainingTime(null);
   }, [soundscapeId]);
@@ -212,7 +262,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       setRemainingTime(getRemainingSeconds(audio));
     };
 
-    const events = [
+    const metadataEvents = [
       "loadedmetadata",
       "durationchange",
       "loadeddata",
@@ -220,16 +270,20 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       "timeupdate",
     ];
 
-    events.forEach((eventName) => {
+    metadataEvents.forEach((eventName) => {
       audio.addEventListener(eventName, updateRemainingTime);
     });
+
+    audio.addEventListener("playing", handlePlaybackStarted);
+    audio.addEventListener("waiting", handleBuffering);
+    audio.addEventListener("stalled", handleBuffering);
 
     audio.load();
     updateRemainingTime();
 
     let cancelled = false;
 
-    probeAudioDuration(audio).then(() => {
+    probeAudioDuration(audio, isProbingRef).then(() => {
       if (!cancelled) {
         updateRemainingTime();
       }
@@ -237,11 +291,18 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
 
     return () => {
       cancelled = true;
-      events.forEach((eventName) => {
+      metadataEvents.forEach((eventName) => {
         audio.removeEventListener(eventName, updateRemainingTime);
       });
+      audio.removeEventListener("playing", handlePlaybackStarted);
+      audio.removeEventListener("waiting", handleBuffering);
+      audio.removeEventListener("stalled", handleBuffering);
     };
-  }, [soundscape?.audioUrl]);
+  }, [
+    handleBuffering,
+    handlePlaybackStarted,
+    soundscape?.audioUrl,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -250,15 +311,22 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     }
 
     if (isPlaying) {
-      audio.play().then(() => {
-        syncRemainingTime();
-      }).catch(() => {
-        setIsPlaying(false);
-      });
+      audio
+        .play()
+        .then(() => {
+          syncRemainingTime();
+        })
+        .catch(() => {
+          trackEvent("play_failed");
+          isBufferingRef.current = false;
+          isPlayingIntentRef.current = false;
+          setIsBuffering(false);
+          setIsPlaying(false);
+        });
     } else {
       audio.pause();
     }
-  }, [isPlaying, syncRemainingTime]);
+  }, [isPlaying, syncRemainingTime, trackEvent]);
 
   useEffect(() => {
     return () => {
@@ -268,25 +336,42 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
 
   function onToggle() {
     if (isPlaying) {
-      addCurrentPlaySegment();
-      trackEvent("pause");
+      if (hasStartedPlaybackRef.current) {
+        finalizeCurrentSegment();
+        trackEvent("pause");
+      } else {
+        trackEvent("play_cancelled");
+      }
+
+      isBufferingRef.current = false;
+      isPlayingIntentRef.current = false;
+      setIsBuffering(false);
       setIsPlaying(false);
       return;
     }
 
-    ensureSessionStarted();
-    playStartedAtRef.current = Date.now();
-    trackEvent(hasPlayedRef.current ? "resume" : "play");
-    hasPlayedRef.current = true;
+    isPlayingIntentRef.current = true;
     setIsPlaying(true);
   }
 
   function onAudioEnded() {
-    addCurrentPlaySegment();
+    finalizeCurrentSegment();
     trackEvent("timer_complete");
     trackEvent("ended");
     endSession("audio_ended");
     resetPlayer();
+  }
+
+  function getStatusLabel() {
+    if (isBuffering) {
+      return "Buffering...";
+    }
+
+    if (isPlaying) {
+      return "Playing";
+    }
+
+    return "Paused";
   }
 
   if (!soundscape) {
@@ -296,7 +381,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   return (
     <div onClick={onToggle} className="soundPlayer">
       <div className="texts">
-        <p>{isPlaying ? "Playing" : "Paused"}</p>
+        <p>{getStatusLabel()}</p>
         <h3>{soundscape.title}</h3>
         <p>{formatTime(remainingTime)}</p>
       </div>
