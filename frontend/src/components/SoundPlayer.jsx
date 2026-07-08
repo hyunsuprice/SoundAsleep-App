@@ -174,11 +174,21 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       return;
     }
 
-    sessionStartedAtRef.current = new Date().toISOString();
+    const sessionStartedAt = new Date().toISOString();
+    sessionStartedAtRef.current = sessionStartedAt;
     trackEvent("session_started", {
-      sessionStartedAt: sessionStartedAtRef.current,
+      sessionStartedAt,
     });
   }, [trackEvent]);
+
+  const resetSessionTracking = useCallback(() => {
+    sessionIdRef.current = createSessionId();
+    sessionStartedAtRef.current = null;
+    segmentStartAudioTimeRef.current = null;
+    totalPlayedSecondsRef.current = 0;
+    hasStartedPlaybackRef.current = false;
+    sessionEndedRef.current = false;
+  }, []);
 
   const endSession = useCallback(
     (reason, options = {}) => {
@@ -264,6 +274,10 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
         return;
       }
 
+      if (sessionEndedRef.current) {
+        resetSessionTracking();
+      }
+
       isPlayingIntentRef.current = true;
       setIsPlaying(true);
       trackEvent("play_requested", { source });
@@ -285,7 +299,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
           isProgrammaticControlRef.current = false;
         });
     },
-    [syncRemainingTime, trackEvent]
+    [resetSessionTracking, syncRemainingTime, trackEvent]
   );
 
   const handlePlaybackStarted = useCallback(() => {
@@ -355,18 +369,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   }, [pausePlayback, startPlayback]);
 
   useEffect(() => {
-    sessionIdRef.current = createSessionId();
-    sessionStartedAtRef.current = null;
-    segmentStartAudioTimeRef.current = null;
-    totalPlayedSecondsRef.current = 0;
-    hasStartedPlaybackRef.current = false;
-    sessionEndedRef.current = false;
+    resetSessionTracking();
     isBufferingRef.current = false;
     isPlayingIntentRef.current = false;
     setIsBuffering(false);
     setIsPlaying(false);
     setRemainingTime(null);
-  }, [soundscapeId]);
+  }, [resetSessionTracking, soundscapeId]);
 
   useEffect(() => {
     if (!soundscape || !("mediaSession" in navigator)) {
@@ -414,20 +423,10 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       }
     };
 
-    const handlePageHide = (event) => {
-      if (event.persisted || !isPlayingIntentRef.current) {
-        return;
-      }
-
-      endSession("page_closed");
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pagehide", handlePageHide);
     };
   }, [
     endSession,
