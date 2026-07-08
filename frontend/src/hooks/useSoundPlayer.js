@@ -14,6 +14,7 @@ function createTrackingState() {
   return {
     sessionId: createSessionId(),
     sessionStartedAt: null,
+    sessionEnded: false,
     segmentStart: null,
     totalPlayed: 0,
     hasStarted: false,
@@ -177,6 +178,28 @@ export function useSoundPlayer(participantId, soundscapeId) {
     [finalizeSegment, trackEvent]
   );
 
+  const endSession = useCallback(
+    (reason) => {
+      const tracking = trackingRef.current;
+      if (!tracking.sessionStartedAt || tracking.sessionEnded) {
+        return;
+      }
+
+      tracking.sessionEnded = true;
+      finalizeSegment();
+      trackEvent(
+        "session_ended",
+        {
+          sessionStartedAt: tracking.sessionStartedAt,
+          sessionEndedAt: new Date().toISOString(),
+          reason,
+        },
+        { preferBeacon: true }
+      );
+    },
+    [finalizeSegment, trackEvent]
+  );
+
   const resetPlayer = useCallback(() => {
     const audio = audioRef.current;
 
@@ -288,6 +311,12 @@ export function useSoundPlayer(participantId, soundscapeId) {
   }, [resetPlayer, trackPause]);
 
   useEffect(() => {
+    return () => {
+      endSession("soundscape_change");
+    };
+  }, [endSession, soundscapeId]);
+
+  useEffect(() => {
     trackingRef.current = createTrackingState();
     setIsPlaying(false);
     setRemainingTime(null);
@@ -377,11 +406,9 @@ export function useSoundPlayer(participantId, soundscapeId) {
 
   useEffect(() => {
     return () => {
-      if (trackingRef.current.wantPlaying) {
-        trackPause("left_player");
-      }
+      endSession("left_player");
     };
-  }, [trackPause]);
+  }, [endSession]);
 
   return {
     soundscape,
