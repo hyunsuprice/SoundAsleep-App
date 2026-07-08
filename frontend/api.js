@@ -1,6 +1,5 @@
 import axios from "axios";
 
-const PRODUCTION_API_URL = "https://soundasleep-app.onrender.com";
 const DEVELOPMENT_API_URL = "http://localhost:3000";
 
 function normalizeApiUrl(url) {
@@ -17,15 +16,16 @@ function getApiUrl() {
 
     if (!import.meta.env.DEV && isLocalhost) {
       console.warn(
-        "Ignoring localhost VITE_API_URL in production. Using production API instead."
+        "Ignoring localhost VITE_API_URL in production. Using /api proxy instead."
       );
-      return PRODUCTION_API_URL;
+      return "/api";
     }
 
     return normalizedUrl;
   }
 
-  return import.meta.env.DEV ? DEVELOPMENT_API_URL : PRODUCTION_API_URL;
+  // Dev hits the backend directly; production uses Vercel rewrite (vercel.json).
+  return import.meta.env.DEV ? DEVELOPMENT_API_URL : "/api";
 }
 
 const API_URL = getApiUrl();
