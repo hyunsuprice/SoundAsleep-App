@@ -5,20 +5,11 @@ const routes = require("./routes.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const PRODUCTION_ORIGIN = "https://sound-asleep-app.vercel.app";
 
+// Public study API: allow frontend origins including Vercel previews.
+// Vercel's /api proxy forwards the browser Origin header to Render.
 const corsOptions = {
-  origin: (origin, callback) => {
-    const isLocalhost =
-      !origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
-
-    if (isLocalhost || origin === PRODUCTION_ORIGIN) {
-      callback(null, true);
-      return;
-    }
-
-    callback(new Error("Not allowed by CORS"));
-  },
+  origin: true,
   credentials: true,
 };
 

@@ -26,7 +26,7 @@ export default function SoundCard({ sound, onToggle }) {
       <img src={sound.imageUrl} className="sound-img" alt={sound.title} />
       <div>
         <h5 className="sound-title">{sound.title}</h5>
-        <audio ref={audioRef} src={sound.audioUrl} />
+        <audio ref={audioRef} src={sound.audioUrl} playsInline />
       </div>
       <FontAwesomeIcon
         size="4x"
