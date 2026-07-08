@@ -112,6 +112,8 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   const isProbingRef = useRef(false);
   const isBufferingRef = useRef(false);
   const isPlayingIntentRef = useRef(false);
+  const isHandlingNativeControlRef = useRef(false);
+  const playerApiRef = useRef({});
   const soundscape = getSoundscapeById(soundscapeId);
 
   const syncRemainingTime = useCallback(() => {
@@ -137,17 +139,20 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   }, []);
 
   const trackEvent = useCallback(
-    (eventType, extraData = {}) => {
-      postPlaybackEvent({
-        sessionId: sessionIdRef.current,
-        participantId,
-        soundscapeId,
-        eventType,
-        audioTimeSeconds: getAudioTimeSeconds(),
-        totalPlayedSeconds: getTotalPlayedSeconds(),
-        timestamp: new Date().toISOString(),
-        ...extraData,
-      });
+    (eventType, extraData = {}, options = {}) => {
+      postPlaybackEvent(
+        {
+          sessionId: sessionIdRef.current,
+          participantId,
+          soundscapeId,
+          eventType,
+          audioTimeSeconds: getAudioTimeSeconds(),
+          totalPlayedSeconds: getTotalPlayedSeconds(),
+          timestamp: new Date().toISOString(),
+          ...extraData,
+        },
+        options
+      );
     },
     [getAudioTimeSeconds, getTotalPlayedSeconds, participantId, soundscapeId]
   );
@@ -176,18 +181,22 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   }, [trackEvent]);
 
   const endSession = useCallback(
-    (reason) => {
+    (reason, options = {}) => {
       if (!sessionStartedAtRef.current || sessionEndedRef.current) {
         return;
       }
 
       finalizeCurrentSegment();
       sessionEndedRef.current = true;
-      trackEvent("session_ended", {
-        reason,
-        sessionStartedAt: sessionStartedAtRef.current,
-        sessionEndedAt: new Date().toISOString(),
-      });
+      trackEvent(
+        "session_ended",
+        {
+          reason,
+          sessionStartedAt: sessionStartedAtRef.current,
+          sessionEndedAt: new Date().toISOString(),
+        },
+        options
+      );
     },
     [finalizeCurrentSegment, trackEvent]
   );
@@ -206,7 +215,49 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     setIsBuffering(false);
     syncRemainingTime();
     setIsPlaying(false);
+
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = "none";
+    }
   }, [syncRemainingTime]);
+
+  const pausePlayback = useCallback(
+    (source = "ui") => {
+      if (!isPlayingIntentRef.current) {
+        return;
+      }
+
+      if (hasStartedPlaybackRef.current) {
+        finalizeCurrentSegment();
+        trackEvent("pause", { source });
+      } else {
+        trackEvent("play_cancelled", { source });
+      }
+
+      isBufferingRef.current = false;
+      isPlayingIntentRef.current = false;
+      setIsBuffering(false);
+      setIsPlaying(false);
+
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
+    },
+    [finalizeCurrentSegment, trackEvent]
+  );
+
+  const startPlayback = useCallback(
+    (source = "ui") => {
+      if (isPlayingIntentRef.current) {
+        return;
+      }
+
+      isPlayingIntentRef.current = true;
+      setIsPlaying(true);
+      trackEvent("play_requested", { source });
+    },
+    [trackEvent]
+  );
 
   const handlePlaybackStarted = useCallback(() => {
     const audio = audioRef.current;
@@ -224,6 +275,10 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     segmentStartAudioTimeRef.current = audio.currentTime;
     trackEvent(hasStartedPlaybackRef.current ? "resume" : "play");
     hasStartedPlaybackRef.current = true;
+
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = "playing";
+    }
   }, [ensureSessionStarted, trackEvent]);
 
   const handleBuffering = useCallback(() => {
@@ -238,6 +293,57 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     }
   }, [trackEvent]);
 
+  const handleNativePause = useCallback(() => {
+    const audio = audioRef.current;
+
+    if (
+      isHandlingNativeControlRef.current ||
+      isProbingRef.current ||
+      !audio ||
+      audio.ended
+    ) {
+      return;
+    }
+
+    if (!isPlayingIntentRef.current) {
+      return;
+    }
+
+    isHandlingNativeControlRef.current = true;
+    pausePlayback("system");
+    isHandlingNativeControlRef.current = false;
+  }, [pausePlayback]);
+
+  const handleNativePlay = useCallback(() => {
+    if (isHandlingNativeControlRef.current || isProbingRef.current) {
+      return;
+    }
+
+    if (isPlayingIntentRef.current) {
+      return;
+    }
+
+    isHandlingNativeControlRef.current = true;
+    startPlayback("system");
+    isHandlingNativeControlRef.current = false;
+  }, [startPlayback]);
+
+  const onToggle = useCallback(() => {
+    if (isPlayingIntentRef.current) {
+      pausePlayback("ui");
+      return;
+    }
+
+    startPlayback("ui");
+  }, [pausePlayback, startPlayback]);
+
+  useEffect(() => {
+    playerApiRef.current = {
+      startPlayback,
+      pausePlayback,
+    };
+  }, [pausePlayback, startPlayback]);
+
   useEffect(() => {
     sessionIdRef.current = createSessionId();
     sessionStartedAtRef.current = null;
@@ -251,6 +357,75 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     setIsPlaying(false);
     setRemainingTime(null);
   }, [soundscapeId]);
+
+  useEffect(() => {
+    if (!soundscape || !("mediaSession" in navigator)) {
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: soundscape.title,
+      artist: "SoundAsleep",
+      album: "Sleep Soundscape",
+      artwork: soundscape.imageUrl
+        ? [{ src: soundscape.imageUrl, sizes: "512x512", type: "image/jpeg" }]
+        : [],
+    });
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      playerApiRef.current.startPlayback?.("lock_screen");
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      playerApiRef.current.pausePlayback?.("lock_screen");
+    });
+
+    return () => {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+    };
+  }, [soundscape]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (isPlayingIntentRef.current) {
+          trackEvent("page_hidden");
+        }
+        return;
+      }
+
+      syncRemainingTime();
+
+      if (hasStartedPlaybackRef.current) {
+        trackEvent("page_visible", {
+          reconciledAudioTimeSeconds: getAudioTimeSeconds(),
+          reconciledTotalPlayedSeconds: getTotalPlayedSeconds(),
+        });
+      }
+    };
+
+    const handlePageHide = (event) => {
+      if (event.persisted || !isPlayingIntentRef.current) {
+        return;
+      }
+
+      endSession("page_closed");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [
+    endSession,
+    getAudioTimeSeconds,
+    getTotalPlayedSeconds,
+    syncRemainingTime,
+    trackEvent,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -277,6 +452,8 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     audio.addEventListener("playing", handlePlaybackStarted);
     audio.addEventListener("waiting", handleBuffering);
     audio.addEventListener("stalled", handleBuffering);
+    audio.addEventListener("pause", handleNativePause);
+    audio.addEventListener("play", handleNativePlay);
 
     audio.load();
     updateRemainingTime();
@@ -297,9 +474,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       audio.removeEventListener("playing", handlePlaybackStarted);
       audio.removeEventListener("waiting", handleBuffering);
       audio.removeEventListener("stalled", handleBuffering);
+      audio.removeEventListener("pause", handleNativePause);
+      audio.removeEventListener("play", handleNativePlay);
     };
   }, [
     handleBuffering,
+    handleNativePause,
+    handleNativePlay,
     handlePlaybackStarted,
     soundscape?.audioUrl,
   ]);
@@ -323,7 +504,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
           setIsBuffering(false);
           setIsPlaying(false);
         });
-    } else {
+    } else if (!audio.paused) {
       audio.pause();
     }
   }, [isPlaying, syncRemainingTime, trackEvent]);
@@ -333,26 +514,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       endSession("left_player");
     };
   }, [endSession]);
-
-  function onToggle() {
-    if (isPlaying) {
-      if (hasStartedPlaybackRef.current) {
-        finalizeCurrentSegment();
-        trackEvent("pause");
-      } else {
-        trackEvent("play_cancelled");
-      }
-
-      isBufferingRef.current = false;
-      isPlayingIntentRef.current = false;
-      setIsBuffering(false);
-      setIsPlaying(false);
-      return;
-    }
-
-    isPlayingIntentRef.current = true;
-    setIsPlaying(true);
-  }
 
   function onAudioEnded() {
     finalizeCurrentSegment();
@@ -395,6 +556,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
         ref={audioRef}
         src={soundscape.audioUrl}
         preload="metadata"
+        playsInline
         onEnded={onAudioEnded}
       />
     </div>

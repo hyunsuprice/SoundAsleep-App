@@ -1,0 +1,18 @@
+{
+  "name": "SoundAsleep",
+  "short_name": "SoundAsleep",
+  "description": "Personalized sleep soundscapes for the SoundAsleep study",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04308e",
+  "theme_color": "#04308e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/background.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
