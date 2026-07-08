@@ -112,7 +112,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   const isProbingRef = useRef(false);
   const isBufferingRef = useRef(false);
   const isPlayingIntentRef = useRef(false);
-  const isHandlingNativeControlRef = useRef(false);
+  const isProgrammaticControlRef = useRef(false);
   const playerApiRef = useRef({});
   const soundscape = getSoundscapeById(soundscapeId);
 
@@ -239,6 +239,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       setIsBuffering(false);
       setIsPlaying(false);
 
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        isProgrammaticControlRef.current = true;
+        audio.pause();
+        isProgrammaticControlRef.current = false;
+      }
+
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "paused";
       }
@@ -252,11 +259,33 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
         return;
       }
 
+      const audio = audioRef.current;
+      if (!audio) {
+        return;
+      }
+
       isPlayingIntentRef.current = true;
       setIsPlaying(true);
       trackEvent("play_requested", { source });
+
+      isProgrammaticControlRef.current = true;
+      audio
+        .play()
+        .then(() => {
+          syncRemainingTime();
+        })
+        .catch(() => {
+          trackEvent("play_failed");
+          isBufferingRef.current = false;
+          isPlayingIntentRef.current = false;
+          setIsBuffering(false);
+          setIsPlaying(false);
+        })
+        .finally(() => {
+          isProgrammaticControlRef.current = false;
+        });
     },
-    [trackEvent]
+    [syncRemainingTime, trackEvent]
   );
 
   const handlePlaybackStarted = useCallback(() => {
@@ -297,36 +326,17 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     const audio = audioRef.current;
 
     if (
-      isHandlingNativeControlRef.current ||
+      isProgrammaticControlRef.current ||
       isProbingRef.current ||
       !audio ||
-      audio.ended
+      audio.ended ||
+      !isPlayingIntentRef.current
     ) {
       return;
     }
 
-    if (!isPlayingIntentRef.current) {
-      return;
-    }
-
-    isHandlingNativeControlRef.current = true;
     pausePlayback("system");
-    isHandlingNativeControlRef.current = false;
   }, [pausePlayback]);
-
-  const handleNativePlay = useCallback(() => {
-    if (isHandlingNativeControlRef.current || isProbingRef.current) {
-      return;
-    }
-
-    if (isPlayingIntentRef.current) {
-      return;
-    }
-
-    isHandlingNativeControlRef.current = true;
-    startPlayback("system");
-    isHandlingNativeControlRef.current = false;
-  }, [startPlayback]);
 
   const onToggle = useCallback(() => {
     if (isPlayingIntentRef.current) {
@@ -453,7 +463,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     audio.addEventListener("waiting", handleBuffering);
     audio.addEventListener("stalled", handleBuffering);
     audio.addEventListener("pause", handleNativePause);
-    audio.addEventListener("play", handleNativePlay);
 
     audio.load();
     updateRemainingTime();
@@ -475,39 +484,13 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       audio.removeEventListener("waiting", handleBuffering);
       audio.removeEventListener("stalled", handleBuffering);
       audio.removeEventListener("pause", handleNativePause);
-      audio.removeEventListener("play", handleNativePlay);
     };
   }, [
     handleBuffering,
     handleNativePause,
-    handleNativePlay,
     handlePlaybackStarted,
     soundscape?.audioUrl,
   ]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) {
-      return;
-    }
-
-    if (isPlaying) {
-      audio
-        .play()
-        .then(() => {
-          syncRemainingTime();
-        })
-        .catch(() => {
-          trackEvent("play_failed");
-          isBufferingRef.current = false;
-          isPlayingIntentRef.current = false;
-          setIsBuffering(false);
-          setIsPlaying(false);
-        });
-    } else if (!audio.paused) {
-      audio.pause();
-    }
-  }, [isPlaying, syncRemainingTime, trackEvent]);
 
   useEffect(() => {
     return () => {
