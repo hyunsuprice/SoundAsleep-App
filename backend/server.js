@@ -5,39 +5,11 @@ const routes = require("./routes.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const PRODUCTION_ORIGIN = "https://sound-asleep-app.vercel.app";
 
-function isAllowedOrigin(origin) {
-  if (!origin) {
-    return true;
-  }
-
-  if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
-    return true;
-  }
-
-  if (origin === PRODUCTION_ORIGIN) {
-    return true;
-  }
-
-  // Allow Vercel preview deployments, e.g. sound-asleep-app-git-main-*.vercel.app
-  if (/^https:\/\/[\w-]+\.vercel\.app$/i.test(origin)) {
-    return true;
-  }
-
-  return false;
-}
-
+// Public study API: allow frontend origins including Vercel previews.
+// Vercel's /api proxy forwards the browser Origin header to Render.
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (isAllowedOrigin(origin)) {
-      callback(null, true);
-      return;
-    }
-
-    console.warn("Blocked CORS origin:", origin);
-    callback(new Error("Not allowed by CORS"));
-  },
+  origin: true,
   credentials: true,
 };
 
