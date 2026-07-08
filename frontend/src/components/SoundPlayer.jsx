@@ -100,7 +100,6 @@ function probeAudioDuration(audio, isProbingRef) {
 
 export default function SoundPlayer({ participantId, soundscapeId }) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
   const [remainingTime, setRemainingTime] = useState(null);
   const audioRef = useRef(null);
   const sessionIdRef = useRef(createSessionId());
@@ -109,7 +108,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   const totalPlayedSecondsRef = useRef(0);
   const hasStartedPlaybackRef = useRef(false);
   const isProbingRef = useRef(false);
-  const isBufferingRef = useRef(false);
   const isPlayingIntentRef = useRef(false);
   const isProgrammaticControlRef = useRef(false);
   const playerApiRef = useRef({});
@@ -209,9 +207,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     }
 
     segmentStartAudioTimeRef.current = null;
-    isBufferingRef.current = false;
     isPlayingIntentRef.current = false;
-    setIsBuffering(false);
     syncRemainingTime();
     setIsPlaying(false);
 
@@ -228,9 +224,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
 
       trackPause(source);
 
-      isBufferingRef.current = false;
       isPlayingIntentRef.current = false;
-      setIsBuffering(false);
       setIsPlaying(false);
 
       const audio = audioRef.current;
@@ -267,9 +261,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
         syncRemainingTime();
       })
       .catch(() => {
-        isBufferingRef.current = false;
         isPlayingIntentRef.current = false;
-        setIsBuffering(false);
         setIsPlaying(false);
       })
       .finally(() => {
@@ -283,11 +275,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       return;
     }
 
-    if (isBufferingRef.current) {
-      isBufferingRef.current = false;
-      setIsBuffering(false);
-    }
-
     ensureSessionStarted();
     segmentStartAudioTimeRef.current = audio.currentTime;
     trackEvent(hasStartedPlaybackRef.current ? "resume" : "play");
@@ -298,17 +285,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     }
   }, [ensureSessionStarted, trackEvent]);
 
-  const handleBuffering = useCallback(() => {
-    if (isProbingRef.current || !isPlayingIntentRef.current) {
-      return;
-    }
-
-    if (!isBufferingRef.current) {
-      isBufferingRef.current = true;
-      setIsBuffering(true);
-    }
-  }, []);
-
   const handleNativePause = useCallback(() => {
     const audio = audioRef.current;
 
@@ -317,12 +293,14 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
       isProbingRef.current ||
       !audio ||
       audio.ended ||
-      !isPlayingIntentRef.current
+      !isPlayingIntentRef.current ||
+      !hasStartedPlaybackRef.current ||
+      segmentStartAudioTimeRef.current == null
     ) {
       return;
     }
 
-    pausePlayback("system");
+    pausePlayback("lock_screen");
   }, [pausePlayback]);
 
   const onToggle = useCallback(() => {
@@ -343,9 +321,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
 
   useEffect(() => {
     resetSessionTracking();
-    isBufferingRef.current = false;
     isPlayingIntentRef.current = false;
-    setIsBuffering(false);
     setIsPlaying(false);
     setRemainingTime(null);
   }, [resetSessionTracking, soundscapeId]);
@@ -422,8 +398,6 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
     });
 
     audio.addEventListener("playing", handlePlaybackStarted);
-    audio.addEventListener("waiting", handleBuffering);
-    audio.addEventListener("stalled", handleBuffering);
     audio.addEventListener("pause", handleNativePause);
 
     audio.load();
@@ -443,16 +417,9 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
         audio.removeEventListener(eventName, updateRemainingTime);
       });
       audio.removeEventListener("playing", handlePlaybackStarted);
-      audio.removeEventListener("waiting", handleBuffering);
-      audio.removeEventListener("stalled", handleBuffering);
       audio.removeEventListener("pause", handleNativePause);
     };
-  }, [
-    handleBuffering,
-    handleNativePause,
-    handlePlaybackStarted,
-    soundscape?.audioUrl,
-  ]);
+  }, [handleNativePause, handlePlaybackStarted, soundscape?.audioUrl]);
 
   useEffect(() => {
     return () => {
@@ -468,15 +435,7 @@ export default function SoundPlayer({ participantId, soundscapeId }) {
   }
 
   function getStatusLabel() {
-    if (isBuffering) {
-      return "Buffering...";
-    }
-
-    if (isPlaying) {
-      return "Playing";
-    }
-
-    return "Paused";
+    return isPlaying ? "Playing" : "Paused";
   }
 
   if (!soundscape) {
