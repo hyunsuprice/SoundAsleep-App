@@ -10,10 +10,13 @@ function createSessionId() {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
+
 function createTrackingState() {
   return {
     sessionId: createSessionId(),
     sessionStartedAt: null,
+    sessionEnded: false,
     segmentStart: null,
     totalPlayed: 0,
     hasStarted: false,
@@ -138,7 +141,7 @@ export function useSoundPlayer(participantId, soundscapeId) {
       postPlaybackEvent(
         {
           sessionId: trackingRef.current.sessionId,
-          participantId,
+          participantId: String(participantId || "").trim().toLowerCase(),
           soundscapeId,
           eventType,
           timestamp: new Date().toISOString(),
@@ -164,6 +167,21 @@ export function useSoundPlayer(participantId, soundscapeId) {
     }
   }, []);
 
+  const ensureSessionStarted = useCallback(() => {
+    const tracking = trackingRef.current;
+    if (tracking.sessionStartedAt || tracking.sessionEnded) {
+      return;
+    }
+
+    // Fire while the tap gesture is still current (page usually visible).
+    // Waiting for the audio "playing" event loses events when users lock
+    // the phone immediately after pressing play.
+    tracking.sessionStartedAt = new Date().toISOString();
+    trackEvent("session_started", {
+      sessionStartedAt: tracking.sessionStartedAt,
+    });
+  }, [trackEvent]);
+
   const trackPause = useCallback(
     (source) => {
       const tracking = trackingRef.current;
@@ -173,6 +191,32 @@ export function useSoundPlayer(participantId, soundscapeId) {
 
       finalizeSegment();
       trackEvent("pause", { source });
+    },
+    [finalizeSegment, trackEvent]
+  );
+
+  const endSession = useCallback(
+    (reason) => {
+      const tracking = trackingRef.current;
+      if (!tracking.sessionStartedAt || tracking.sessionEnded) {
+        return;
+      }
+
+      tracking.sessionEnded = true;
+      tracking.wantPlaying = false;
+      finalizeSegment();
+      trackEvent(
+        "session_ended",
+        {
+          sessionStartedAt: tracking.sessionStartedAt,
+          sessionEndedAt: new Date().toISOString(),
+          reason,
+        },
+        {
+          preferBeacon: reason === "tab_closed",
+          onUnload: reason === "tab_closed",
+        }
+      );
     },
     [finalizeSegment, trackEvent]
   );
@@ -198,12 +242,13 @@ export function useSoundPlayer(participantId, soundscapeId) {
       const tracking = trackingRef.current;
 
       if (wantPlaying) {
-        if (tracking.wantPlaying || !audio) {
+        if (tracking.wantPlaying || !audio || tracking.sessionEnded) {
           return;
         }
 
         tracking.wantPlaying = true;
         setIsPlaying(true);
+        ensureSessionStarted();
         tracking.isProgrammatic = true;
 
         audio
@@ -212,6 +257,7 @@ export function useSoundPlayer(participantId, soundscapeId) {
           .catch(() => {
             tracking.wantPlaying = false;
             setIsPlaying(false);
+            trackEvent("play_failed", { source });
           })
           .finally(() => {
             tracking.isProgrammatic = false;
@@ -235,29 +281,28 @@ export function useSoundPlayer(participantId, soundscapeId) {
 
       setMediaSessionState("paused");
     },
-    [syncRemainingTime, trackPause]
+    [ensureSessionStarted, syncRemainingTime, trackEvent, trackPause]
   );
 
   const onAudioPlaying = useCallback(() => {
     const audio = audioRef.current;
     const tracking = trackingRef.current;
 
-    if (!audio || tracking.isProbing || !tracking.wantPlaying) {
+    if (
+      !audio ||
+      tracking.isProbing ||
+      !tracking.wantPlaying ||
+      tracking.sessionEnded
+    ) {
       return;
     }
 
-    if (!tracking.sessionStartedAt) {
-      tracking.sessionStartedAt = new Date().toISOString();
-      trackEvent("session_started", {
-        sessionStartedAt: tracking.sessionStartedAt,
-      });
-    }
-
+    ensureSessionStarted();
     tracking.segmentStart = audio.currentTime;
     trackEvent(tracking.hasStarted ? "resume" : "play");
     tracking.hasStarted = true;
     setMediaSessionState("playing");
-  }, [trackEvent]);
+  }, [ensureSessionStarted, trackEvent]);
 
   const onAudioPause = useCallback(() => {
     const audio = audioRef.current;
@@ -320,7 +365,10 @@ export function useSoundPlayer(participantId, soundscapeId) {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!trackingRef.current.sessionStartedAt) {
+      if (
+        !trackingRef.current.sessionStartedAt ||
+        trackingRef.current.sessionEnded
+      ) {
         return;
       }
 
@@ -338,6 +386,40 @@ export function useSoundPlayer(participantId, soundscapeId) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [syncRemainingTime, trackEvent]);
+
+  useEffect(() => {
+    const heartbeatId = window.setInterval(() => {
+      const tracking = trackingRef.current;
+      if (
+        !tracking.wantPlaying ||
+        !tracking.sessionStartedAt ||
+        tracking.sessionEnded
+      ) {
+        return;
+      }
+
+      trackEvent("heartbeat");
+    }, HEARTBEAT_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(heartbeatId);
+    };
+  }, [trackEvent]);
+
+  useEffect(() => {
+    const handlePageHide = (event) => {
+      if (event.persisted) {
+        return;
+      }
+
+      endSession("tab_closed");
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [endSession]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -377,11 +459,23 @@ export function useSoundPlayer(participantId, soundscapeId) {
 
   useEffect(() => {
     return () => {
-      if (trackingRef.current.wantPlaying) {
-        trackPause("left_player");
+      if (document.visibilityState === "hidden") {
+        return;
       }
+
+      endSession("soundscape_change");
     };
-  }, [trackPause]);
+  }, [endSession, soundscapeId]);
+
+  useEffect(() => {
+    return () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      endSession("left_player");
+    };
+  }, [endSession]);
 
   return {
     soundscape,

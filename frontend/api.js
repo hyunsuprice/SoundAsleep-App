@@ -1,7 +1,7 @@
 import axios from "axios";
 
-const DEVELOPMENT_API_URL = "http://localhost:3000";
 const EVENT_QUEUE_KEY = "soundasleep_pending_events";
+const FLUSH_INTERVAL_MS = 30_000;
 
 function normalizeApiUrl(url) {
   const trimmed = url.trim().replace(/\/+$/, "");
@@ -25,10 +25,21 @@ export function getApiUrl() {
     return normalizedUrl;
   }
 
-  return import.meta.env.DEV ? DEVELOPMENT_API_URL : "/api";
+  // Same-origin /api so sendBeacon works in both Vite (proxied) and Vercel.
+  return "/api";
 }
 
 const API_URL = getApiUrl();
+
+let flushPromise = null;
+
+function createClientEventId() {
+  if (crypto?.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `evt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function readQueuedEvents() {
   try {
@@ -48,7 +59,18 @@ function writeQueuedEvents(events) {
 }
 
 function queueEvent(event) {
-  writeQueuedEvents([...readQueuedEvents(), event]);
+  const queuedEvents = readQueuedEvents();
+  if (queuedEvents.some((item) => item.clientEventId === event.clientEventId)) {
+    return;
+  }
+
+  writeQueuedEvents([...queuedEvents, event]);
+}
+
+function removeQueuedEvent(clientEventId) {
+  writeQueuedEvents(
+    readQueuedEvents().filter((event) => event.clientEventId !== clientEventId)
+  );
 }
 
 function sendEventInBackground(event) {
@@ -81,51 +103,71 @@ async function sendEvent(event) {
 }
 
 export async function flushQueuedPlaybackEvents() {
-  const queuedEvents = readQueuedEvents();
-
-  if (queuedEvents.length === 0) {
-    return;
+  if (flushPromise) {
+    return flushPromise;
   }
 
-  const failedEvents = [];
+  flushPromise = (async () => {
+    const queuedEvents = readQueuedEvents();
 
-  for (const event of queuedEvents) {
-    try {
-      await sendEvent(event);
-    } catch (error) {
-      failedEvents.push(event);
-      console.error("Error flushing queued playback event:", error.message);
+    if (queuedEvents.length === 0) {
+      return;
     }
-  }
 
-  writeQueuedEvents(failedEvents);
+    const failedEvents = [];
+
+    for (const event of queuedEvents) {
+      try {
+        await sendEvent(event);
+      } catch (error) {
+        failedEvents.push(event);
+        console.error("Error flushing queued playback event:", error.message);
+      }
+    }
+
+    writeQueuedEvents(failedEvents);
+  })().finally(() => {
+    flushPromise = null;
+  });
+
+  return flushPromise;
 }
 
 export async function postPlaybackEvent(event, options = {}) {
+  const enrichedEvent = {
+    ...event,
+    clientEventId: event.clientEventId || createClientEventId(),
+  };
+
+  // Persist first. Beacon/fetch keepalive are best-effort only and must
+  // never be treated as confirmed delivery (common overnight phone failure).
+  queueEvent(enrichedEvent);
+
   const useBackgroundDelivery =
-    options.preferBeacon || document.visibilityState === "hidden";
+    options.preferBeacon ||
+    options.onUnload ||
+    document.visibilityState === "hidden";
 
   if (useBackgroundDelivery) {
-    const delivered = sendEventInBackground(event);
-    if (delivered) {
-      return { delivered: true, method: "background" };
-    }
-
-    queueEvent(event);
-    return null;
+    sendEventInBackground(enrichedEvent);
+    return {
+      delivered: false,
+      method: "queued-background",
+      clientEventId: enrichedEvent.clientEventId,
+    };
   }
 
   try {
-    const data = await sendEvent(event);
+    await sendEvent(enrichedEvent);
+    removeQueuedEvent(enrichedEvent.clientEventId);
     await flushQueuedPlaybackEvents();
-    return data;
+    return {
+      delivered: true,
+      method: "axios",
+      clientEventId: enrichedEvent.clientEventId,
+    };
   } catch (error) {
-    queueEvent(event);
-
-    if (sendEventInBackground(event)) {
-      return { delivered: true, method: "background-fallback" };
-    }
-
+    sendEventInBackground(enrichedEvent);
     console.error("Error saving playback event:", {
       apiUrl: `${API_URL}/playback-events`,
       message: error.message,
@@ -147,6 +189,7 @@ export function setupPlaybackEventSync() {
       flush();
     }
   });
+  window.setInterval(flush, FLUSH_INTERVAL_MS);
 
   flush();
 }

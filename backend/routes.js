@@ -8,6 +8,7 @@ routes.post("/playback-events", async (request, response) => {
     const db = database.getDb();
 
     const playbackEvent = {
+      clientEventId: request.body.clientEventId || null,
       sessionId: request.body.sessionId,
       participantId: request.body.participantId,
       soundscapeId: request.body.soundscapeId,
@@ -24,12 +25,22 @@ routes.post("/playback-events", async (request, response) => {
         ? new Date(request.body.sessionEndedAt)
         : null,
       reason: request.body.reason || null,
+      source: request.body.source || null,
       serverTimestamp: new Date(),
     };
 
-    const data = await db
-      .collection("playbackEvents")
-      .insertOne(playbackEvent);
+    let data;
+
+    // Idempotent write so queued retries / beacon+flush do not duplicate rows.
+    if (playbackEvent.clientEventId) {
+      data = await db.collection("playbackEvents").updateOne(
+        { clientEventId: playbackEvent.clientEventId },
+        { $setOnInsert: playbackEvent },
+        { upsert: true }
+      );
+    } else {
+      data = await db.collection("playbackEvents").insertOne(playbackEvent);
+    }
 
     response.json(data);
   } catch (error) {

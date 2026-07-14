@@ -26,7 +26,7 @@ export const soundscapeLibrary = [
 ];
 
 const participantSoundscapeAssignments = {
-  "01": ["alex_01", "alex_02"],
+  "01": ["alex_01"],
   "02": ["anya_01"],
   "03": ["raphael_01"],
 };
